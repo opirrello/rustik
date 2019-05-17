@@ -1,0 +1,4 @@
+<?php
+class DictionaryModel extends Model {
+   protected $_primary_key = array('id');
+}

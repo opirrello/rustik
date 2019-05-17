@@ -1,0 +1,309 @@
+<?php
+class PdfHandler {
+   private $_stylesheet;
+   private $_header;
+   private $_footer;
+   private $_content;
+   private $_pdfObj;
+
+   private function __construct() {
+      $avoid_inc[] = 'cached_pdf_decorator.cls.php';
+      $avoid_inc[] = 'page_cache.cls.php';
+      $avoid_inc[] = 'tcpdf_adapter.cls.php';
+
+      $first_inc[] = 'dompdf_config.inc.php';
+      $first_inc[] = 'lib/class.pdf.php';
+      $first_inc[] = 'include/positioner.cls.php';
+      $first_inc[] = 'include/canvas.cls.php';
+      $first_inc[] = 'include/cpdf_adapter.cls.php';
+      $first_inc[] = 'include/frame.cls.php';
+      $first_inc[] = 'include/cellmap.cls.php';
+      $first_inc[] = 'include/frame_decorator.cls.php';
+      $first_inc[] = 'include/frame_reflower.cls.php';
+      $first_inc[] = 'include/block_frame_decorator.cls.php';
+      $first_inc[] = 'include/block_frame_reflower.cls.php';
+      $first_inc[] = 'include/table_frame_decorator.cls.php';
+      $first_inc[] = 'include/table_cell_frame_decorator.cls.php';
+      $first_inc[] = 'include/table_cell_frame_reflower.cls.php';
+
+      foreach ($first_inc as $filename) {
+         //echo "<BR>".DOMPDF_ROOT.$filename;
+         include_once(DOMPDF_ROOT.$filename);
+      }
+      //echo "<BR>------------<BR>";
+
+      foreach(glob(DOMPDF_ROOT.'lib/*.php') as $class) {
+         //echo "<BR>".$class;
+         include_once $class;
+      }
+      //echo "<BR>------------<BR>";
+
+      foreach(glob(DOMPDF_ROOT.'include/*.cls.php') as $class) {
+         //echo "<BR>==>".str_replace(DOMPDF_ROOT.'include/','', $class);
+         if (in_array(str_replace(DOMPDF_ROOT.'include/','', $class), $avoid_inc))
+         continue;
+
+         if (!in_array(str_replace(DOMPDF_ROOT.'include/','', $class), $first_inc))
+         //echo "<BR>".$class;
+         include_once $class; 
+      }
+      //echo "<BR>------------<BR>";
+
+      $this->_pdfObj = new DOMPDF();
+      $this->_pdfObj->set_base_path(SYS_TEMPORARYPATH);
+   }
+
+   public static function createDocument() {
+      return new PdfHandler();
+   }
+
+   public function setPaper($paper='a4', $orientation='portrait') {
+      $this->_pdfObj->set_paper($paper, $orientation);
+   }
+
+   public function addStyleSheet($cssfile) {
+      if (file_exists(SYS_SERVERROOT.'/'.APP_LAYOUTPATH."styles/$cssfile")) {
+         $csscontent = file_get_contents(SYS_SERVERROOT.'/'.APP_LAYOUTPATH."styles/$cssfile");
+         $this->_stylesheet = "<style>\n$csscontent\n</style>";
+      }
+   }
+
+   public function createFooter($footInfo=false) {
+      if (!$footInfo || !is_array($footInfo)) {
+         $logo = false;
+         $title = (empty($footInfo))?APP_MAINTITLE:$footInfo;
+      }
+      elseif (is_array($footInfo)) {
+         $logo = (!empty($footInfo['logo']))?APP_IMAGEURL.$footInfo['logo']:false;
+         $title= (!empty($footInfo['title']))?$footInfo['title']:APP_MAINTITLE; 
+      }
+
+      $main_div  = HtmlHandler::createElement('div');
+      $main_table= HtmlHandler::createElement('table');
+      $main_row  = HtmlHandler::createElement('tr');
+
+      $cell_logo = HtmlHandler::createElement('td');
+      $cell_text = HtmlHandler::createElement('td');
+      $cell_page = HtmlHandler::createElement('td');
+      /*
+      $main_div = HtmlHandler::createElement('div');
+      $div_logo = HtmlHandler::createElement('div');
+      $div_text = HtmlHandler::createElement('div');
+      $div_page = HtmlHandler::createElement('div');
+*/
+      if ($logo) {
+         list($width, $height, $type, $attributes) = getimagesize('./'.APP_IMAGEPATH.$footInfo['logo']);
+
+         $img= HtmlHandler::createElement('img');
+         $img->setAttribute('src',$logo);
+         $img->setAttribute('width',$width);
+         $img->setAttribute('height',$height);
+      }
+
+      $p1 = HtmlHandler::createElement('p');
+      $p1->addContent('Página ');
+
+      $cell_logo->addElement($img);
+      $cell_text->addContent($title);
+      $cell_text->setAttribute('class','center');
+      $cell_page->addElement($p1);
+      $cell_page->setAttribute('class','right');
+
+      $main_row->addElement($cell_logo);
+      $main_row->addElement($cell_text);
+      $main_row->addElement($cell_page);
+
+      $main_table->addElement($main_row);
+      $main_div->addElement($main_table);
+
+      $main_div->setAttribute('id','footer');
+
+      $this->_footer = $main_div->getHTML();
+   }
+
+   public function createHeader($headInfo=false) {
+      $date = Date('d/m/Y');
+
+      if (!$headInfo || !is_array($headInfo)) {
+         $logo = false;
+         $title = (empty($headInfo))?APP_MAINTITLE:$headInfo;
+         $subtitle = false;
+      }
+      elseif (is_array($headInfo)) {
+         $logo = (!empty($headInfo['logo']))?APP_IMAGEURL.$headInfo['logo']:false;
+         $title= (!empty($headInfo['title']))?$headInfo['title']:APP_MAINTITLE; 
+         $subtitle= (!empty($headInfo['subtitle']))?$headInfo['subtitle']:false;
+      }
+
+      $main_div = HtmlHandler::createElement('div');
+      $div_logo = HtmlHandler::createElement('div');
+      $div_title= HtmlHandler::createElement('div');
+
+      if ($logo) {
+         list($width, $height, $type, $attributes) = getimagesize('./'.APP_IMAGEPATH.$headInfo['logo']);
+
+         $img= HtmlHandler::createElement('img');
+         $img->setAttribute('src',$logo);
+         $img->setAttribute('width',$width);
+         $img->setAttribute('height',$height);
+      }
+
+      $p1 = HtmlHandler::createElement('p');
+      $p2 = HtmlHandler::createElement('p');
+      $p3 = HtmlHandler::createElement('p');
+      $p1->addContent($date);
+      $p2->addContent($title);
+      $p3->addContent($subtitle);
+
+      $div_logo->addElement($img);
+      $div_title->addElement($p1);
+      $div_title->addElement($p2);
+      $div_title->addElement($p3);
+
+      $main_div->addElement($div_logo);
+      $main_div->addElement($div_title);
+      $main_div->setAttribute('id','header');
+
+      $this->_header = $main_div->getHTML();
+   }
+
+   public function addContent2Table($content) {
+      if (is_array($content)) {
+         $table = HtmlHandler::createElement('table');
+
+         if (!empty($content['attributes'])) {
+            foreach($content['attributes'] as $att=>$value) {
+               $table->setAttribute($att, $value);
+            }
+         }
+
+         if (!empty($content['thead'])) {
+            $thead = HtmlHandler::createElement('thead');
+
+            foreach($content['thead'] as $row) {
+               $tr = HtmlHandler::createElement('tr');
+               $cantcols[] = sizeof($row);
+
+               foreach($row as $column) {
+                  $th = HtmlHandler::createElement('th');
+                  $th->addContent($column);
+                  $tr->addElement($th);
+               }
+
+               $thead->addElement($tr);
+            }
+
+            $table->addElement($thead);
+         }
+
+         if (!empty($content['tbody'])) {
+            $tbody = HtmlHandler::createElement('tbody');
+
+            foreach($content['tbody'] as $row) {
+               $tr = HtmlHandler::createElement('tr');
+
+               if ($idx % 2)
+               $tr->setAttribute('class','odd');
+
+               foreach($row as $field) {
+                  $td = HtmlHandler::createElement('td');
+                  $td->addContent($field);
+
+                  if (is_numeric($field))
+                  $td->setAttribute('class','right');
+
+                  $tr->addElement($td);
+               }
+               
+               $idx++;
+
+               $tbody->addElement($tr);
+            }
+
+            $table->addElement($tbody);
+         }
+
+         if (!empty($content['tfoot'])) {
+            $tfoot = HtmlHandler::createElement('tfoot');
+
+            foreach($content['tfoot'] as $posix=>$row) {
+               $tr = HtmlHandler::createElement('tr');
+
+               if ($cantcols[$posix] > sizeof($row)) {
+                  $tr_blank = HtmlHandler::createElement('tr');
+                  $td = HtmlHandler::createElement('td');
+                  $tr_blank->setAttribute('class','blank');
+                  $tr_blank->addElement($td);
+                  $tfoot->addElement($tr_blank);
+
+                  $td = HtmlHandler::createElement('td');
+                  $td->setAttribute('colspan', $cantcols[$posix] - sizeof($row));
+                  $td->setAttribute('class','right');
+                  $td->addContent('TOTALES');
+                  $tr->addElement($td);
+               }
+
+               foreach($row as $field) {
+                  $td = HtmlHandler::createElement('td');
+                  $td->addContent($field);
+
+                  if (is_numeric($field))
+                  $td->setAttribute('class','right');
+
+                  $tr->addElement($td);
+               }
+
+               $tfoot->addElement($tr);
+            }
+
+            $table->addElement($tfoot);
+         }
+
+         $this->_content.= $table->getHTML();
+      }
+   }
+
+   public function loadHTML($html) {
+      $this->_pdfObj->load_html($html);
+   }
+
+   public function composeHTML() {
+      $own_html = "<html lang=\"es\">";
+      $own_html.= "<head>";
+      $own_html.= "<meta http-equiv=\"content-type\" content=\"text/html; charset=UTF-8\">";
+      $own_html.= "<meta name=\"dompdf.view\" content=\"XYZ,0,0,1\">";
+      $own_html.= $this->_stylesheet;
+      $own_html.= "</head>";
+      $own_html.= "<body>";
+      $own_html.= $this->_header;
+      $own_html.= $this->_footer;
+      $own_html.= $this->_content;
+      $own_html.= "</body>";
+      $own_html.= "</html>";
+
+//echo $own_html;
+//die;
+      $this->_pdfObj->load_html($own_html);
+   }
+
+   public function sendTo($filename, $to='FILE') {
+      //$outExt  = $this->__getDocExt();
+      $outFile = "$filename.pdf";
+
+      switch($to) {
+      case 'DEBUG':
+         print $this->_pdfObj->output_html();
+         die;
+         break;
+
+      case 'FILE':
+         break;
+
+      case 'BROWSER':
+         $this->_pdfObj->render();
+         $this->_pdfObj->stream($outFile); 
+         unset($this->_pdfObj);
+         break;
+      }   
+   }   
+}

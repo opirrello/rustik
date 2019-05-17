@@ -1,0 +1,42 @@
+<?php
+class SecurityCodeModel extends Model {
+   protected $_primary_key = array('id');
+
+   public function generateCodeFor($codeType, $entId, $sel, $token, $withTran) {
+      $rollback = false;
+
+      if ($withTran) $this->execute("BEGIN");
+
+      $added  = $this->insertBy(array('NULL',$sel,$token,$codeType, $entId, 'NOW()','S'));
+      //echo $this->_dbhandler->getLastQry();
+
+      if ($added == -1) {
+         if ($withTran) $this->execute("ROLLBACK");
+         return false;
+      }
+      else {
+         $id =  $this->_dbhandler->getLastId();
+         if ($withTran) $this->execute("COMMIT");
+         return $id;
+      }
+   }
+
+   public function disableCode($selector, $withTran) {
+      $rollback = false;
+
+      if ($withTran) $this->execute("BEGIN");
+
+      if (is_array($selector))
+           $disabled = $this->updateBy(array('active'=>'N'), array('selector'=>array('IN',$selector)));
+      else $disabled = $this->updateBy(array('active'=>'N'), array('selector'=>$selector));
+
+      if ($disabled < 1) {
+         if ($withTran) $this->execute("ROLLBACK");
+         return false;
+      }
+      else {
+         if ($withTran) $this->execute("COMMIT");
+         return true;
+      }
+   }
+}

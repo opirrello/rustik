@@ -1,0 +1,309 @@
+<?php
+class SecurityHandler {
+   public static $instance; 
+   
+   private $_codeParams = array(
+         'seedmin'=>1,
+         'seedmax'=>400);
+
+   private $_captchaParams = array(
+         'signs' => array('+','-','*'),
+         'operations' => array('s91u5','sm1nu5','smu171'),
+         'digits' => array('d0n3','d7w0','d7hr33','df0vr','df1v3','d51x','d53v3n','d31gh7','dn1n3','d73n'),
+         //digits = ['one','two','three','four','five','six','seven','eight','nine','ten'];
+         'range_low' => 1,
+         'range_high' => 10,
+         'cantf_def' => 4);
+
+   public static function getInstance($unknowns = "") {
+      if (!isset(self::$instance)) {
+         self::$instance = new SecurityHandler();
+      }
+
+      return self::$instance;
+   }
+  
+   private function __construct($unknowns = "") {
+   }  
+
+   public function xssClean($value, $allowed=false) {
+      //if (empty($allowed)) {
+         $value = strip_tags($value);
+         $value = htmlentities($value, ENT_QUOTES);
+         $value = stripcslashes($value);
+      //}
+      //else {
+      //}
+
+      return $value;
+   }
+
+   public function captchaGenerate() {
+      foreach($this->_captchaParams as $parName=>$parValue) {
+         $$parName = $parValue;
+      }
+
+      $cantf = ($_POST['fakes'])?$_POST['fakes'] : $cantf_def;
+
+      $right_calc   = $this->_captchaCalc($range_low, $range_high);
+      $fake_results = $this->_captchaFakeResults($right_calc['result'], $cantf);
+
+      ///// "tirando" el "dado" 3 veces, para que cada generacion de captcha no repita la posicion
+      for ($i=0; $i<3; $i++)
+      $fake_index = mt_rand(0, sizeof($fake_results) - 1);
+      /////
+
+      ///// Metiendo el resultado correcto en una posicion aleatoria del fake_results
+      array_splice($fake_results, $fake_index, 0, $right_calc['result']);
+
+      $captcha_data['results'] = $fake_results;
+      $captcha_data['operation']['first_digit'] = $digits[$right_calc['digit_a'] - 1];
+      $captcha_data['operation']['second_digit']= $digits[$right_calc['digit_b'] - 1];
+      $captcha_data['operation']['operator']    = $operations[array_search($right_calc['oper'], $signs)];
+     
+      return $captcha_data;
+   }
+
+   protected function _captchaCalc($range_low, $range_high) {
+      $digit_a = mt_rand($range_low, $range_high);
+      $digit_b = mt_rand($range_low, $range_high);
+      $oper    = $this->_captchaParams['signs'][ mt_rand(0,sizeof($this->_captchaParams['signs']) - 1) ];
+      
+      //// Inversion to avoid negative result
+      if ($oper == '-' && $digit_b > $digit_a) {
+         $digit_aux = $digit_b;
+   
+         $digit_b = $digit_a;
+         $digit_a = $digit_aux;
+      }
+
+      switch($oper) {
+         case '+': $result = $digit_a + $digit_b; break;
+         case '-': $result = $digit_a - $digit_b; break;
+         case '*': $result = $digit_a * $digit_b; break;
+      }
+
+      return array('digit_a'=>$digit_a, 'digit_b'=>$digit_b, 'oper'=>$oper, 'result'=>$result);
+   }
+
+   protected function _captchaFakeResults($numBase, $cantFakes) {
+      $range_low = $this->_captchaParams['range_low'];
+      $range_high= $this->_captchaParams['range_high'];
+      $fake_list = array();
+
+      for($i=0; $i<$cantFakes; $i++) {
+         do {
+            $fakeOper = $this->_captchaCalc($range_low, $range_high);
+         }
+         while (!in_array($fakeOper['result'], $fake_list) != -1 || $fakeOper['result'] == $numBase);
+
+         $fake_list[] = $fakeOper['result'];
+      }
+
+      return $fake_list;
+   }
+
+   public function captchaVerify($first_digit, $second_digit, $operator, $result) {
+      foreach($this->_captchaParams as $parName=>$parValue) {
+         $$parName = $parValue;
+      }
+   
+      $da = array_search($first_digit, $digits) + 1;
+      $db = array_search($second_digit, $digits) + 1;
+      $op = $signs[array_search($operator, $operations)];
+
+      switch($op) {
+         case '+': $right = $da + $db; break;
+         case '-': $right = $da - $db; break;
+         case '*': $right = $da * $db; break;
+      }
+
+      return $result == $right;
+   }
+
+   public function createHashCode($source) {
+      $method = (defined('RM_AUTH_ENC_METHOD'))?RM_VCOD_ENC_METHOD:'sha1';
+      $salt   = (defined('RM_AUTH_ENC_SALT'))?RM_VCOD_ENC_SALT:'';
+      $phrase = $salt . $source. date('Ymdhis');
+
+      return hash($method, $phrase);
+   }
+
+   public function maskId($id) {
+      $prefix = mt_rand($this->_codeParams['seedmin'], $this->_codeParams['seedmax']);
+
+      do { $posfix = mt_rand($this->_codeParams['seedmin'], $this->_codeParams['seedmax']); }
+      while($posfix == $prefix);
+
+      return $prefix.$id.$posfix;
+   }
+
+   public function unmaskId($selector) {
+      return substr(substr($selector, 4), 0,-4);
+   }
+
+   public function verifySecurityCode($hashcode, $type, $inTransaction=true) {
+      $codeModel= new SecurityCodeModel();
+      $codeArr  = explode('-', $hashcode);
+      $relatedId= SecurityHandler::getInstance()->unmaskId($codeArr[0]);
+      $codeData = $codeModel->selectBy(array("selector"=>$codeArr[0], "code_type"=>$type),
+                                       array('*','timestampdiff(minute, creation, now()) as creation_interval'));
+      $codeData = $codeData[0];
+
+      // code statuses: 'INVALID' | 'VALID' | 'EXPIRED' | 'INEXITENT';
+
+      $result['info'] = $codeData;
+      $errCode = "403";
+      $errText = "Fail";
+
+      if (!is_array($codeData) || empty($codeData)) {
+         $result['status'] = 'INEXISTENT';
+      }
+      elseif ($codeData['code_value'] != $codeArr[1]) {
+         $result['status'] = 'INVALID';
+      }
+      elseif ($codeData['active'] != 'S') {
+         $result['status'] = 'INACTIVE';
+      }
+      elseif (intval($codeData['creation_interval']) > RM_SCOD_REG_ACTEXP) { 
+         $result['status'] = 'EXPIRED';
+      }
+      else {
+         $result['status'] = 'VALID';
+         $disabled = $codeModel->disableCode($codeArr[0], $inTransaction);
+         $errCode = "200";
+         $errText = "Done";
+      }
+      
+      logEvent("$errCode $errText - Verifying Security Code", "codeType: $type // selector: {$codeArr[0]} // result: ".json_encode($result));
+
+      return $result;
+   }
+
+   public function generateSecurityCode($relatedId, $source, $type=RM_SCOD_COMMON, $inTransaction=true) {
+      if (is_bool($type)) {
+         $inTransaction = $type;
+         $type = RM_SCOD_COMMON;
+      }
+
+      if (is_string($inTransaction)) {
+         $type = $inTransaction;
+         $inTransaction = true;
+      }
+
+      $codeModel = new SecurityCodeModel();
+      $hashcode  = $this->createHashCode($source);
+      $selector  = $this->maskId($relatedId);
+
+      /// Al generar codigos de recuperacion de clave, el handler inabilita todo codigo activo del mismo tipo
+      if ($type == RM_SCOD_RESETPASS) {
+         $codeArr = $codeModel->selectBy(array("related_id"=>$relatedId,
+                                                "code_type"=>array('IN',RM_SCOD_RESETPASS, RM_SCOD_NEWPASS)));
+         if (sizeof($codeArr)) {
+            foreach ($codeArr as $codeData) {
+               $disabled = $codeModel->disableCode($codeData['selector'], $inTransaction);
+            }
+         }
+      }
+
+      $codeId = $codeModel->generateCodeFor($type, $relatedId, $selector, $hashcode, $inTransaction);
+
+      if ($codeId)
+           return array('id'=>$codeId,'selector'=>$selector,'code_value'=>$hashcode,'security_code'=>$selector.'-'.$hashcode);
+      else return false;
+   }
+
+   public function restoreKeepSession() {
+      $keepModel = new KeepSessionModel();
+
+      if (defined('RM_AUTH_KEEP_ACTIVE') && RM_AUTH_KEEP_ACTIVE) {
+         $cookiename = (defined('RM_AUTH_KEEP_COOKIE'))?RM_AUTH_KEEP_COOKIE:'rememberme';
+         $keepInfo   = explode(':',$_COOKIE[$cookiename]);
+         $entId      = $this->unmaskId($keepInfo[0]);
+         $cookiedata = $entId. $_SERVER['REMOTE_ADDR']. $_SERVER['HTTP_USER_AGENT'].date('Ymdhis');
+         $newToken   = $this->createHashCode($cookiedata);
+
+         if ($keepModel->updateTokenFor($keepInfo[0], $newToken))
+         setcookie($cookiename, "$keepInfo[0]:$newToken", time()+60*60*24*100, '/');
+      }
+   }
+
+   public function validateKeepSession() {
+      $keepModel = new KeepSessionModel();
+      $keepname = (defined('RM_AUTH_KEEP_COOKIE'))?RM_AUTH_KEEP_COOKIE:'rememberme';
+      $keepInfo = $keepStatus = false;
+      
+      if ( defined('RM_AUTH_KEEP_ACTIVE') && RM_AUTH_KEEP_ACTIVE ) {
+         if ( isset($_COOKIE[$keepname]) ) {
+            $keepArr  = explode(':',$_COOKIE[$keepname]);
+            $keepInfo = $keepModel->selectBy(array('selector'=>$keepArr[0]));
+            $keepInfo = $keepInfo[0];
+
+            if (!is_array($keepInfo) || empty($keepInfo)) {
+               $keepStatus = -2;
+               //return -2; /// invalid
+            }
+            /// If keep was hacked, show error and return...
+            else if ($keepInfo['token'] != $keepArr[1]) {
+               $keepStatus = -1;
+               //return -1; /// invalid
+            }
+            else{
+               $keepStatus = 1;
+               //return 1; // valid
+            }
+         }
+         else $keepStatus = 0; /// cookie unset
+      }
+      else $keepStatus = 2; /// keep session disabled
+
+      $keepData['status'] = $keepStatus;
+      $keepData['info'] = $keepInfo;
+
+      return $keepData;
+   }
+
+   public function registerInKeepSession($entId) {
+      $keepModel= new KeepSessionModel();
+
+      if ($_POST['keep'] && defined('RM_AUTH_KEEP_ACTIVE') && RM_AUTH_KEEP_ACTIVE) {
+         $cookiedata = $entId. $_SERVER['REMOTE_ADDR']. $_SERVER['HTTP_USER_AGENT'].date('Ymdhis');
+         $cookiename = (defined('RM_AUTH_KEEP_COOKIE'))?RM_AUTH_KEEP_COOKIE:'rememberme';
+
+         $keepSelec = $this->maskId($entId);
+         $keepToken = $this->createHashCode($cookiedata);
+
+         $keepId = $keepModel->createTokenFor($entId, $keepSelec,$keepToken,'NOW()','NOW()');
+
+         if ($keepId) {
+            setcookie($cookiename, "$keepSelec:$keepToken", time()+60*60*24*100, '/');
+            return $keepSelec;
+         }
+      }
+   }
+
+   public function sessionExists() {
+      return (isset($_COOKIE[session_name()]));
+   }
+
+   public function startSession() {
+      session_start();
+   }
+
+   public function registerInSession($sessVar, $info) {
+      $_SESSION[$sessVar] = $info;
+   }
+
+   public function getFromSession($sessVar) {
+      return $_SESSION[$sessVar];
+   }
+
+   public function destroySession() {
+      if (isset($_COOKIE[session_name()])) {
+         setcookie(session_name(), '', time()-42000, '/');
+      }
+
+      session_unset();
+      session_destroy();
+   }
+}

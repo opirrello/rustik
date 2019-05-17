@@ -1,0 +1,132 @@
+<?php
+class SystemHandler {
+   public static $instance;
+   protected $_seedmin = 100;
+   protected $_seedmax = 400;
+
+   private function __construct() {
+   }
+
+   public static function getInstance() {
+      if (!isset(self::$instance)) {
+         self::$instance = new SystemHandler();
+      }
+
+      return self::$instance;
+   }
+
+   public function isCliRequest() {
+      if (isset($_SERVER['argv']))
+           return true;
+      else return false;
+   }
+
+   public function isAjaxRequest() {
+      if ((isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') ||
+          (isset($_SERVER['HTTP_CUSTOM_REQUEST']) && strtolower($_SERVER['HTTP_CUSTOM_REQUEST']) == 'appservice'))
+           return true;
+      else return false;
+   }
+
+   public function isDefinedController($controllerName) {
+      //$controllerName = strtolower($controllerName);
+      //$controllerName = ucfirst($controllerName);
+
+      //echo("<BR>".APP_CONTROLLERPATH ."{$controllerName}.class");
+      if (is_file(RM_CORE_CONTROLLERPATH ."{$controllerName}.class") && class_exists($controllerName)) {
+         return true;
+      }
+      else return false;
+   }
+
+   public function isDefinedHandler($entity) {
+      $controller = ucfirst(strtolower($entity));
+
+      if (is_file(RM_CORE_HANDLERPATH ."{$entity}Handler.class") && class_exists($controllerName)) {
+         return true;
+      }
+      else return false;
+   }
+
+   public function isDefinedView($entity) {
+      if (is_file(RM_CORE_VIEWPATH ."{$entity}.".RM_VIEW_FILETYPE)) {
+         return true;
+      }
+      else return false;
+   }
+
+   public function loadController($controllerName) {
+      if ($this->isDefinedController($controllerName)) {
+         $controller = ucfirst(strtolower($controllerName));
+
+         include_once (RM_CORE_CONTROLLERPATH . "{$controllerName}.class");
+      }
+      else die("No se puede cargar el controlador $controllerName. No esta definido");
+   }
+
+   public function loadHandler($handler) {
+      if ($this->isDefinedHandler($handler)) {
+         $handler = strtolower($handler);
+         $handler = ucfirst($handler);
+
+         include_once (RM_CORE_HANDLERPATH . "{$handler}Handler.class");
+      }
+      else die("No se puede cargar el handler $handler. No esta definido");
+   }
+
+   public function loadFunctions() {
+      if ($handledir = opendir(RM_CORE_SYSFUNCPATH)) {
+         while (false !== ($file = readdir($handledir))) {
+            if ($file != '.' &&
+                $file != '..' && 
+                is_file(RM_CORE_SYSFUNCPATH.$file) &&
+                substr(RM_CORE_SYSFUNCPATH.$file,-4) == '.fun') {
+
+               include(RM_CORE_SYSFUNCPATH.$file);
+            }
+         }
+      }
+      closedir($handledir);
+
+      if ($handledir = opendir(RM_CORE_APPFUNCPATH)) {
+         while (false !== ($file = readdir($handledir))) {
+            if ($file != '.' &&
+                $file != '..' && 
+                is_file(RM_CORE_APPFUNCPATH.$file) &&
+                substr(RM_CORE_APPFUNCPATH.$file,-4) == '.fun') {
+
+               include(RM_CORE_APPFUNCPATH.$file);
+            }
+         }
+      }
+      closedir($handledir);
+   }
+
+   public function setInitials() {
+      global $init;
+
+      if (!SystemHandler::getInstance()->isAjaxRequest()) {
+         if (isset($init['js_files'])) {
+            foreach ($init['js_files'] as $filename) {
+               TemplateHandler::getInstance()->addJsFiles($filename);
+            }
+         }
+   
+         if (isset($init['css_files'])) {
+            foreach ($init['css_files'] as $filename) {
+               TemplateHandler::getInstance()->addCssFiles($filename);
+            }
+         }
+      }
+   }
+
+   public function getConfig($confVar) {
+   }
+
+   public function isInstanceOf($classname) {
+   }
+
+   static function autoload($classname) {
+      include_once ($classname . '.class');
+   }
+}

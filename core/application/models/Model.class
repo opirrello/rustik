@@ -1,0 +1,490 @@
+<?php
+abstract class Model {
+   protected $_table;
+   protected $_is_abstract;
+   protected $_last_status;
+   protected $_last_query;
+   protected $_dbhandler;
+
+   public function __construct() {
+      $__CLASS__ = get_class($this);
+
+      if (!$this->_is_abtract) {
+         $tablename = str_replace('_model','',strtolower(preg_replace('/([a-z])([A-Z])/', '$1_$2', $__CLASS__)));
+         $this->_table = $tablename;
+         $this->_dbhandler = DatabaseHandler::getInstanceOf();
+      }
+   }
+
+   public function selectById($pkValuesArr=false, $fldColsArr=false, $extraFilterArr=false) {
+      $__CLASS__ = get_class($this);
+
+      if ($this->_is_abstract) {
+         die($__CLASS__. ": Modelo abstracto no puede seleccionar por clave"); 
+      }
+      elseif (!is_array($this->_primary_key)) {
+         die($__CLASS__. ": Modelo con PK mal definida (debe ser un arreglo)"); 
+      }
+      elseif (!is_array($pkValuesArr)) {
+         die($__CLASS__. ": (". __METHOD__ .") los valores de clave deben pasarse como array");
+      }
+      elseif (sizeof($pkValuesArr) != sizeof($this->_primary_key)) {
+         die($__CLASS__. ": (".__METHOD__.") el rango de valores de clave difiere del rango de campos que componen la clave");
+      }
+      if (!empty($fldColsArr) && !is_array($fldValuesArr)) {
+         die($__CLASS__. ": (". __METHOD__ .") los valores de columna deben pasarse como array");
+      }
+
+      $filterPkArr = array();
+
+      foreach ($pkValuesArr as $value) {
+         foreach ($this->_primary_key as $key) {
+            $filterPkArr[] = "$key = '$value'";
+         }
+      }
+
+      if (empty($fldColsArr))
+           $qryStr = "SELECT * FROM ". $this->_table. " WHERE ". implode(" AND ",$filterPkArr);
+      else $qryStr = "SELECT ".(implode(',',$fldColsArr))." FROM ". $this->_table. " WHERE ". implode(" AND ",$filterPkArr);
+      //echo $qryStr;
+      $this->_dbhandler->query($qryStr);
+
+      return $this->_dbhandler->getRow();
+   }
+
+   /**********************
+     params:
+     2 params = 1st) filters 2nd) columns
+     1 param  = 1st) associative? then, filters... else, columns
+   *********************/
+   public function selectBy() {
+      $__CLASS__ = get_class($this);
+
+      $cantParams = func_num_args();
+      $extrasArr = $filtersArr = $columnsArr = $where = $from = $select = $orderby = $groupby = $having = $limit = false;
+
+      if ($cantParams > 0) {
+         switch($cantParams) {
+         case 1:
+            $auxArr = func_get_arg(0);
+    
+            if (is_array($auxArr) && isAssociative($auxArr))
+                 $filtersArr = $auxArr;
+            else $columnsArr = $auxArr;
+            break;
+   
+         case 2:
+            $filtersArr = func_get_arg(0);
+            $columnsArr = func_get_arg(1);
+            break;
+   
+         case 3:
+            $filtersArr = func_get_arg(0);
+            $columnsArr = func_get_arg(1);
+            $extrasArr  = func_get_arg(2);
+            break;
+         }
+      }
+
+      //-------------- Building extra clauses ----------------*/
+      if (is_array($extrasArr) && !empty($extrasArr)) {
+         foreach($extrasArr as $tense => $params) {
+            $values = false;
+
+            switch ($tense) {
+            case 'GROUP BY':
+               $groupby = " $tense ".implode(',', $params);
+               break;
+
+            case 'ORDER BY':
+               foreach ($params as $par=>$val) {
+                  $values[] = "$par $val";
+               }
+               $orderby = " $tense ".implode(',', $values);
+               break;
+
+            case 'LIMIT':
+               $limit = " $tense ".implode(',', $params);
+               break;
+
+            case 'HAVING':
+               foreach ($params as $par=>$val) {
+                  if (strpos($par,' ') !== false) {
+                     $parArr = explode(' ',$par);
+                     $cond = $parArr[0];
+                     $par  = $parArr[1];
+                  }
+                  else {
+                     $cond = false;
+                  }
+
+                  $values[] = "$cond $par $val";
+               }
+               $having = " $tense ".implode(' ', $values);
+               break;
+            }
+         }
+
+      }
+      
+      //-------------- Building WHERE clause ----------------*/
+      if ($filtersArr !== false)
+      $where = $this->_createFilterUsing($filtersArr);
+
+      //-------------- Building SELECT clause ----------------*/
+      if (!empty($columnsArr) && !is_array($columnsArr)) {
+         die($__CLASS__. ": (". __METHOD__ .") los valores de columna deben pasarse como array");
+      }
+      elseif (is_array($columnsArr) && !empty($columnsArr))
+           $qryStr = "SELECT ".(implode(',',$columnsArr))." FROM ". $this->_table.$where.$having.$groupby.$orderby.$limit;
+      else $qryStr = "SELECT * FROM ". $this->_table.$where.$having.$groupby.$orderby.$limit;
+
+      $this->_dbhandler->query($qryStr);
+      $this->_last_query = $this->_dbhandler->getLastQry();
+
+      return $this->_dbhandler->getAllRows();
+   }
+
+   /**********************
+     params:
+     1 param = filters
+   *********************/
+   public function deleteBy() {
+      $__CLASS__ = get_class($this);
+
+      $cantParams = func_num_args();
+      $filtersArr = $columnsArr = $where = $from = $select = false;
+
+      if ($cantParams > 0)
+      $filtersArr = func_get_arg(0);
+      
+      //-------------- Building WHERE clause ----------------*/
+      if ($filtersArr !== false)
+      $where = $this->_createFilterUsing($filtersArr);
+
+      //-------------- Building DELETE clause ----------------*/
+      $qryStr = "DELETE FROM ". $this->_table.$where;
+
+      $this->_dbhandler->query($qryStr);
+      $deleted = $this->_dbhandler->getNumRows();
+      //echo $this->_dbhandler->getLastQry();
+      return ($deleted <= 0)?0:$deleted;
+   }
+
+   /**********************
+     params:
+     1 param = fields and values... 
+     2 params= 1rst: fields and values (SET clause) / 2nd: filters (WHERE clause)
+   *********************/
+   public function updateBy($fieldsArr) {
+      $__CLASS__ = get_class($this);
+
+      $cantParams = func_num_args();
+      $filtersArr = $set = $where = false;
+
+      if ($cantParams > 1) {
+         $filtersArr = func_get_arg(1);
+      }
+
+      //-------------- Building WHERE clause ----------------*/
+      if ($filtersArr !== false)
+      $where = $this->_createFilterUsing($filtersArr);
+
+      //-------------- Building SET clause ----------------*/
+      $fields = array_keys($fieldsArr);
+      $values = array_values($fieldsArr);
+
+      foreach($fields as $fld) {
+         $set[] = "$fld = ?";
+      }
+
+      $set = implode(',', $set);
+
+      //-------------- Building UPDATE clause ----------------*/
+      $qryStr = "UPDATE ".$this->_table." SET ".$set.$where;
+
+      $this->_dbhandler->query($qryStr, $values);
+      //echo $this->_dbhandler->getLastQry();
+
+      $affected = $this->_dbhandler->getModifiedRows();
+
+      return ($affected <= 0)?0:$affected;
+   }
+
+   public function insertBy($fieldsArr) {
+      $__CLASS__ = get_class($this);
+
+      $cantParams  = func_num_args();
+      $associative = isAssociative($fieldsArr);
+
+      $marks = $fields = $values = false;
+
+      //-------------- Building INTO/VALUES clauses ----------------*/
+
+      /* checking if is multiple record & defining marks */
+      if (!$associative) {
+         $multiple = (is_array($fieldsArr[0])) ? true:false;
+
+         if ($multiple)
+              $fillArr = array_fill(0, sizeof($fieldsArr[0]), '?');
+         else $fillArr = array_fill(0, sizeof($fieldsArr), '?');
+      }
+      else $fillArr = array_fill(0, sizeof($fieldsArr), '?');
+
+      $valueMarks = implode(',',$fillArr);
+
+
+      /* defining field names, if is associative */
+      if ($associative) {
+         $fields = "(" .implode(',', array_keys($fieldsArr)). ")";
+      }
+
+      $values = array_values($fieldsArr);
+
+      //-------------- Building INSERT clause ----------------*/
+      if ($multiple) {
+         $rawValues = array();
+
+         foreach($values as $row) {
+            $rows[] = "($valueMarks)";
+            $rawValues = array_merge($rawValues, $row);
+         }
+
+         $values = $rawValues;
+
+         $qryStr = "INSERT INTO ". $this->_table.$fields ." VALUES ".implode(',',$rows);
+      }
+      else $qryStr = "INSERT INTO ". $this->_table.$fields ." VALUES ($valueMarks)";
+
+      $this->_dbhandler->query($qryStr, $values);
+      //echo $this->_dbhandler->getLastQry();
+
+      $added = $this->_dbhandler->getNumRows();
+      return ($added <= 0)?0:$added;
+   }
+
+   public function getLastId() {
+      return $this->_dbhandler->getLastId();
+   }
+
+   public function getLastQry() {
+      return $this->_last_query;
+   }
+
+   protected function execute($qryStr, $params=false, $pageData=false) {
+      $__CLASS__ = get_class($this);
+
+      if (is_array($qryStr)) {
+         $qryArr = $qryStr;
+         $qryStr = ((isset($qryArr['tense']))?$qryArr['tense']:'').' '.
+                   ((isset($qryArr['columns']))?$qryArr['columns']:'').' '.
+                   ((isset($qryArr['from']))?" FROM ".$qryArr['from']:'').' '.
+                   ((isset($qryArr['where']))?$qryArr['where']:'').' '.
+                   ((isset($qryArr['having']))?" HAVING ".$qryArr['having']:'').' '.
+                   ((isset($qryArr['group']))?" GROUP BY ".$qryArr['group']:'').' '.
+                   ((isset($qryArr['order']))?" ORDER BY ".$qryArr['order']:'');
+      }
+
+      if (strpos(strtolower($qryStr), 'select') !== false) {
+         if ($pageData !== false) {
+            if (isset($qryArr))
+                 $pagination = $this->_getPaginationData($qryArr, $pageData, $params);
+            else $pagination = $this->_getPaginationData($qryStr, $pageData, $params);
+
+            $from = $pagination['rows_per_page'] * ($pagination['curr_page'] - 1);
+            $nrows= $pagination['rows_per_page'];
+
+            if ($pagination['rows_per_page'] != -1)
+            $qryStr.= " LIMIT $from, $nrows";
+         }
+
+         $this->_dbhandler->query($qryStr, $params);
+         $this->_last_query = $this->_dbhandler->getLastQry();
+      
+         $result = $this->_dbhandler->getAllRows();
+
+         if ($pageData)
+              return array('rows'=>$result, 'pagination'=>$pagination);
+         else return $result;
+      }
+      else {
+         $this->_dbhandler->query($qryStr, $params);
+         $this->_last_query = $this->_dbhandler->getLastQry();
+
+         return $this->_dbhandler->getNumRows();      
+      }
+   }
+
+   protected function _getPaginationData($qry, $pageData=false, $filterData=false) {
+      if (is_array($pageData) && sizeof($pageData)) {
+         $rowsPerPage = (isset($pageData[0]))?intval($pageData[0]):RF_PAGN_NROWS;
+         $pagesPerGroup = (isset($pageData[1]))?intval($pageData[1]):RF_PAGN_NPAGES;
+         $currPage = (isset($pageData[2]))?intval($pageData[2]):RF_PAGN_INITPAGE;
+         $firstPage = (isset($pageData[3]))?intval($pageData[3]):RF_PAGN_INITPAGE;
+      }
+      elseif (is_numeric($pageData)) {
+         $rowsPerPage = RF_PAGN_NROWS;
+         $pagesPerGroup = RF_PAGN_NPAGES;
+         $currPage = $pageData;
+         $firstPage = RF_PAGN_INITPAGE;
+      }
+      else {
+         $rowsPerPage = RF_PAGN_NROWS;
+         $pagesPerGroup = RF_PAGN_NPAGES;
+         $currPage = RF_PAGN_INITPAGE;
+         $firstPage = RF_PAGN_INITPAGE;
+      }
+
+      if (is_array($qry)) {
+         $qry = ((isset($qry['tense']))?$qry['tense']:'').' COUNT(*) AS cant '.
+                ((isset($qry['from']))?" FROM ".$qry['from']:'').' '.
+                ((isset($qry['where']))?$qry['where']:'').' '.
+                ((isset($qry['having']))?" HAVING ".$qry['having']:'');
+      }
+      else {
+         $fromPattr = (strpos(strtolower($qry), "from (") === false)?"from ":"from (";
+         $strFrom = strpos(strtolower($qry), "select") + strlen('select');
+         $strCant = strrpos(strtolower($qry), $fromPattr) - strlen('select');
+         $qry = substr_replace($qry, " COUNT(*) AS cant ", $strFrom, $strCant); 
+   
+         $strFrom = strrpos(strtolower($qry), "limit");
+         if ($strFrom !== false)
+         $qry = substr_replace($qry, "", $strFrom); 
+   
+         $strFrom = strpos(strtolower($qry), "order by");
+         if ($strFrom !== false)
+         $qry = substr_replace($qry, "", $strFrom); 
+
+         $strFrom = strpos(strtolower($qry), "group by");
+         if ($strFrom !== false)
+         $qry = substr_replace($qry, "", $strFrom); 
+      }
+
+      $this->_dbhandler->query($qry, $filterData);
+      $numRows = $this->_dbhandler->getAllRows();
+      $numRows = $numRows[0];
+
+      $rowsPerPage= ($rowsPerPage == -1) ? $numRows['cant'] : $rowsPerPage;
+      $numPages   = ceil($numRows['cant'] / $rowsPerPage);
+
+      $pageInfo['num_rows'] = $numRows['cant'];
+      $pageInfo['num_pages'] = $numPages;
+      $pageInfo['rows_per_page'] = $rowsPerPage;
+      $pageInfo['pages_per_group'] = $pagesPerGroup;
+      $pageInfo['curr_page'] = $currPage;
+      $pageInfo['first_page'] = $firstPage;
+
+      return $pageInfo;
+   }
+
+   private function _createFilterUsing($filtersArr) {
+      $__CLASS__ = get_class($this);
+      $operators = array('>','<','=','<=','>=','!=');
+      $where = false;
+
+      if (empty($filtersArr))
+      return false;
+
+      if (is_array($filtersArr) && !empty($filtersArr)) {
+         /// si no es asociativo es porque son valores de PK
+         if (!isAssociative($filtersArr) && !$this->_is_abstract && isset($this->_primary_key) && is_array($this->_primary_key)) {
+            if (sizeof($filtersArr) == sizeof($this->_primary_key)) {
+               foreach($filtersArr as $idx=>$value) {
+                  $auxArr[$this->_primary_key[$idx]] = $value;
+               }
+            }
+            else if (sizeof($this->_primary_key) == 1) {
+               array_unshift($filtersArr, 'in');
+               $auxArr[$this->_primary_key[0]] = $filtersArr;
+            }
+            else {
+               die($__CLASS__. ": (". __METHOD__ .") los filtros pasados no coinciden con los valores de clave");
+            }
+
+            $filtersArr = $auxArr;
+         }
+      }
+      elseif(!$this->_is_abstract && isset($this->_primary_key)) {
+         return " WHERE ".$this->_primary_key . " = " .$filtersArr;
+      }
+      else {
+         die($__CLASS__. ": (". __METHOD__ .") los filtros deben pasarse como array asociativo, Los valores de PK deben respetar la estructura de la PK definida en el modelo (array ordinal ó valor primario)");
+      }
+
+      //-------------- Building WHERE clause ----------------*/
+      if ($filtersArr != false && !is_array($filtersArr)) {
+         die($__CLASS__. ": (". __METHOD__ .") los valores de filtro deben pasarse como array");
+      }
+      elseif (is_array($filtersArr) && !empty($filtersArr)) {
+         $conditArr = array();
+
+         foreach ($filtersArr as $field => $value) {
+            if (key($filtersArr) == $field) {
+               $cond = '';
+            }
+            elseif (strpos($field,' ') !== false) {
+               $fieldArr = explode(' ',$field);
+               $cond = $fieldArr[0];
+               $field = $fieldArr[1];
+            }
+            else $cond = 'AND';
+
+            if (is_array($value)) {
+               $first = $value[0];
+
+               if (in_array($first, $operators)) {
+                  $value = ($value[1] != 'NULL')?((!is_numeric($value[1]))?"'$value[1]'":$value[1]):'NULL';
+                  $oper = $first;
+               }
+               elseif (strtoupper($first) == 'BETWEEN') {
+                  if (sizeof($value) == 2) {
+                     $oper = strtoupper($first);
+                     $value1 = (!is_numeric($value[1]))?"'$value[1]'":$value[1];
+                     $value2 = (!is_numeric($value[2]))?"'$value[2]'":$value[2];
+                     $value = "$value1 AND $value2";
+                  }
+                  elseif (sizeof($value) > 2) die($__CLASS__. ": (". __METHOD__ .") se deben especificar sólo 2 valores para un filtro por rango");
+                  else die($__CLASS__. ": (". __METHOD__ .") se deben especificar los 2 valores para un filtro por rango");
+               }
+               elseif(in_array(strtoupper($first), array('IN','NOT IN'))) {
+                  if (sizeof($value) > 1) {
+                     $oper = strtoupper($first);
+
+                     for($i=1; $i<sizeof($value); $i++) {
+                        $group[] = (!is_numeric($value[$i]))?"'".$value[$i]."'":$value[$i];
+                     }
+
+                     $value = "(".implode(',',$group).")";
+                  }
+                  else die($__CLASS__. ": (". __METHOD__ .") se deben especificar los valores para un filtro por grupo");
+               }
+               else {
+                  if (sizeof($value) > 1) {
+                     $oper = 'IN';
+
+                     for($i=0; $i<sizeof($value); $i++) $group[] = (!is_numeric($value[$i]))?"'".$value[$i]."'":$value[$i];
+                     $value = "(".implode(',',$group).")";
+                  }
+                  else {
+                     $oper = ' = ';
+                     $value = (!is_numeric($value[0]))?"'".$value[0]."'":$value[0];
+                  }
+               }
+            }
+            elseif (in_array($value, array('IS NOT NULL','IS NULL')) || empty($field)) {
+               $oper = '';
+            }
+            else {
+               $value = (!is_numeric($value))?"'$value'":$value;
+               $oper = '=';
+            }
+
+            $conditArr[] = "$cond $field $oper $value";
+         }
+         
+         $where = " WHERE ". implode(" ",$conditArr);
+      }
+
+      return $where;
+   }
+}

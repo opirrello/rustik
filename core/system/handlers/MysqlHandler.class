@@ -1,0 +1,340 @@
+<?php
+class MysqlHandler extends DatabaseHandler {
+   private $iv_host  = "";
+   private $iv_user  = "";
+   private $iv_pwd   = "";
+   private $iv_base  = "";
+   private $iv_conid = "";
+   private $iv_resid = false;
+   private $iv_lastq = "";
+
+   public static $instance; 
+
+   public static function getInstance() {
+      if (!isset(self::$instance)) {
+         self::$instance = new MysqlHandler();
+      }
+
+      return self::$instance;
+   }
+
+   private function __construct() {
+      global $g_dbEngineParams;
+
+      $this->_engineName = 'mysql';
+      $this->_requiredParams = array('host_db','user_db','pass_db','basename_db');
+
+      if (!$this->__validateConfiguration()) {
+         die();
+      }
+
+      $this->setHost($g_dbEngineParams[$this->_engineName]['host_db']);
+      $this->setUser($g_dbEngineParams[$this->_engineName]['user_db']);
+      $this->setPwd ($g_dbEngineParams[$this->_engineName]['pass_db']);
+      $this->setBase($g_dbEngineParams[$this->_engineName]['basename_db']);
+
+      if (version_compare(PHP_VERSION, '5.0.0', '<'))
+           $conx = mysql_connect($this->getHost(), $this->getUser(), $this->getPwd());
+      else $conx = mysqli_connect($this->getHost(), $this->getUser(), $this->getPwd());
+      
+      $this->setConId($conx);
+
+      if ($this->getConId() <= 0){
+         echo __CLASS__.": Error al conectar a la instancia de Base de Datos";
+         return false;
+      }
+      else{
+         if (version_compare(PHP_VERSION, '5.0.0', '<')) {
+            if (!mysql_select_db($this->getBase(),$this->getConId())){
+               echo __CLASS__.": Error al seleccionar la Base de Datos '".$this->getBase()."'";
+               return false;
+            }
+         }
+         else{
+            if (!mysqli_select_db($this->getConId(), $this->getBase())){
+               echo __CLASS__.": Error al seleccionar la Base de Datos '".$this->getBase()."'";
+               return false;
+            }
+         }
+      }
+   }
+      
+   function getLastId(){
+      if (version_compare(PHP_VERSION, '5.0.0', '<'))
+           return mysql_insert_id($this->getConId());
+      else return mysqli_insert_id($this->getConId());
+   }
+
+   function getLastQry(){
+      return $this->iv_lastq;
+   }
+
+   function getAffectedRows(){
+      if (version_compare(PHP_VERSION, '5.0.0', '<'))
+           return mysql_affected_rows($this->getConId());
+      else return mysqli_affected_rows($this->getConId());
+   }
+
+   function getModifiedRows () {
+      if (version_compare(PHP_VERSION, '5.0.0', '<')) {
+         $info_str = mysql_info($this->getConId());
+         $a_rows = mysql_affected_rows($this->getConId());
+      }
+      else {
+         $info_str = mysqli_info($this->getConId());
+         $a_rows = mysqli_affected_rows($this->getConId());
+      }
+
+      preg_match("/Rows matched: ([0-9]*)/", $info_str, $r_matched);
+      return ($a_rows < 1)?($r_matched[1]?$r_matched[1]:0):$a_rows;
+   }
+
+   /*************************************************************
+
+               Funcion para prevenir SQL Injection
+
+   *************************************************************/
+   function prepareValueOf($value){
+      $magic_quotes_active = get_magic_quotes_gpc();
+      $new_enough_php = function_exists("mysql_real_escape_string");
+//if (is_array($value)) my_dump($value);
+
+      // i.e PHP >= v4.3.0
+      if (version_compare(PHP_VERSION, '5.0.0', '<') && $new_enough_php) {
+        //undo any magic quote effects so mysql_real_escape_string can do the work
+        if ($magic_quotes_active){
+           if (is_array($value)) {
+              $value[0] = stripslashes($value[0]);
+           }
+           else $value = stripslashes($value);
+        }
+
+        if (is_array($value)) {
+           $value[0] = mysql_real_escape_string($value[0]);
+        }
+        else $value = mysql_real_escape_string($value);
+      }
+      // before PHP v4.3.0
+      else if (function_exists("mysqli_real_escape_string")) {
+         // if magic quotes aren't already on this add slashes manually
+         if ($magic_quotes_active){
+            if (is_array($value)) {
+               $value[0] = stripslashes($value[0]);
+            }
+            else $value = stripslashes($value);
+         }
+         //if magic quotes are active, then the slashes already exist
+
+         if (is_array($value)) {
+            $value[0] = mysqli_real_escape_string($this->getConId(), $value[0]);
+         }
+         else $value = mysqli_real_escape_string($this->getConId(), $value);
+      }
+      else {
+         if (!$magic_quotes_active){
+            if (is_array($value)) {
+               $value[0] = addslashes($value[0]);
+            }
+            else $value = addslashes($value);
+         }
+      }
+
+      return $value;
+   } 
+ 
+   function queryBinding($pv_token, $pa_data, $pv_qry){
+      $pv_qry = str_replace($pv_token, "%RMPAR%", $pv_qry);
+
+      for ($lv_i=0; $lv_i<sizeof($pa_data); $lv_i++){
+         $lv_pos = strpos($pv_qry,"%RMPAR%");
+
+         if ($lv_pos !== false){
+            if (is_array($pa_data[$lv_i])) {
+               $lv_data = ($pa_data[$lv_i][1]) ? "'".$pa_data[$lv_i][0]."'":$pa_data[$lv_i][0];
+            }
+            else {
+               $lv_data = ($pa_data[$lv_i] != "NULL" &&
+                           $pa_data[$lv_i] != "NOW()" &&
+                           $pa_data[$lv_i] != "SYSDATE()" &&
+                           $pa_data[$lv_i] != "MONTH()" &&
+                           $pa_data[$lv_i] != "DAY()" &&
+                           $pa_data[$lv_i] != "YEAR()" &&
+                           $pa_data[$lv_i] != "CURRENT()")?"'".$pa_data[$lv_i]."'":$pa_data[$lv_i];
+            }
+
+            $pv_qry = substr_replace($pv_qry, $lv_data, $lv_pos, 7);
+         }
+      }
+
+      return $pv_qry;
+   }
+
+   function query($pv_qry, $pa_data = ""){
+      global $gv_sqlError;
+      global $gv_sqlMsgError;
+      global $gv_showsqlError;
+      global $g_dbEngineParams;
+
+      $_collateDB = $g_dbEngineParams[$this->_engineName]['collate_db'];
+      $_showerrDB = $g_dbEngineParams[$this->_engineName]['showsqlerr_db'];
+
+      if (is_array($pa_data) && sizeof($pa_data)>0){
+         for ($lv_i=0; $lv_i<sizeof($pa_data); $lv_i++){
+            $pa_data[$lv_i] = $this->prepareValueOf($pa_data[$lv_i]);
+         }
+
+         $pv_qry = $this->queryBinding("?",$pa_data,$pv_qry);
+      }
+
+      if (empty($pv_qry) && version_compare(PHP_VERSION, '5.0.0', '<')) {
+         echo "<BR>Handler MySQL: Query no definido<BR>";
+         echo "<BR>Error: ".mysql_errno($this->getConId())."-".mysql_error($this->getConId())."<BR>";
+         return false;
+      }
+      elseif (empty($pv_qry)) {
+         echo "<BR>Handler MySQL: Query no definido<BR>";
+         echo "<BR>Error: ".mysqli_errno($this->getConId())."-".mysqli_error($this->getConId())."<BR>";
+         return false;
+      }
+
+
+      //---------------------- executing query and setting collation ----------------------//
+      if (version_compare(PHP_VERSION, '5.0.0', '<'))
+           mysqli_query( $this->getConId(), 'SET NAMES "'. $_collateDB .'" COLLATE "utf8_general_ci"' );
+      else mysqli_set_charset( $this->getConId(), $_collateDB );
+
+      if (version_compare(PHP_VERSION, '5.0.0', '<'))
+           $resObj = mysql_query($pv_qry, $this->getConId());
+      else $resObj = mysqli_query($this->getConId(), $pv_qry);
+
+      //---------------------- checking query result object ----------------------//
+      if (!$resObj){
+         if (version_compare(PHP_VERSION, '5.0.0', '<'))
+              $err = mysql_errno($this->getConId())."-".mysql_error($this->getConId());
+         else $err = mysqli_errno($this->getConId())."-".mysqli_error($this->getConId());
+
+         $this->iv_lastq = "(STATUS:$err) $pv_qry";
+
+         if ($_showerrDB){
+            if (!SystemHandler::getInstance()->isAjaxRequest() && !SystemHandler::getInstance()->isCliRequest()) {
+               echo "<BR>----------------------------------------------------------<BR>";
+               echo "<strong>Handler MySQL: Error en ejecución de query => $pv_qry</strong><BR>";
+               echo "[ Error: $err ]<BR>";
+               echo "<BR>----------------------------------------------------------<BR>";
+            }
+            return false;
+         }
+      }
+      else {
+         //--------------------------- register last triggered query ---------------------------//
+         if (version_compare(PHP_VERSION, '5.0.0', '<'))
+              $this->iv_lastq = "(STATUS:$resObj) $pv_qry";
+         else if (is_object($resObj))
+              $this->iv_lastq = "(RESULT: ".$resObj->num_rows." rows) $pv_qry";
+         else $this->iv_lastq = "(STATUS:$resObj) $pv_qry";
+
+         if (version_compare(PHP_VERSION, '5.0.0', '<'))
+            $this->setResId($resObj);
+         else {
+            if (is_object($resObj)) {
+               $this->setResId($resObj);
+            }
+            else {
+               $this->setResId($resObj);
+            }
+         }
+      }
+   }
+    
+   function close(){
+      if (version_compare(PHP_VERSION, '5.0.0', '<'))
+           mysqli_close($this->getResId());
+      else mysql_close($this->getResId());
+   }
+
+   function getRow($way = "A"){
+      if ($this->getResId() == ""){
+         return false;
+      }
+
+      if (version_compare(PHP_VERSION, '5.0.0', '<')) {
+         if ($way == "N")
+              $rowArr = mysql_fetch_array($this->getResId(),MYSQL_NUM);
+         else $rowArr = mysql_fetch_array($this->getResId(),MYSQL_ASSOC);
+      }
+      else {
+         if ($way == "N")
+              $rowArr = mysqli_fetch_array($this->getResId(),MYSQLI_NUM);
+         else $rowArr = mysqli_fetch_array($this->getResId(),MYSQLI_ASSOC);
+      }
+
+      if (!$rowArr) return false;
+
+      return $rowArr;
+   }
+
+   function getAllRows($way = "A") {
+      for ($i=0; $i<$this->getNumRows(); $i++){
+         $rows[] = $this->getRow($way);
+      }
+
+      return $rows;
+   }
+
+   function getType($fld){
+      if (version_compare(PHP_VERSION, '5.0.0', '<')) {
+         $type = mysql_field_type($this->getResId(),$fld);
+      }
+      else {
+         $fieldObj = mysqli_fetch_field_direct($this->getResId(),$fld);
+         $type = $fieldObj->type;
+      }
+
+      return $type;
+   }
+
+   function getNumRows(){
+      if ($this->getResId() !== false) {
+         if (version_compare(PHP_VERSION, '5.0.0', '<'))
+              $numRows = mysql_num_rows($this->getResId());
+         else $numRows = (!is_object($this->getResId())) ? mysqli_affected_rows($this->getConId()):
+                                                           mysqli_num_rows($this->getResId());
+
+         if (mysqli_errno($this->getConId()))
+              return -1;
+         else return $numRows;
+      }
+      else return false;
+   }
+
+   function getTables(){
+      //$lv_link = mysql_list_tables($this->getBase(),$this->getConid());
+      $this->query('SHOW TABLES');
+      return $this->getAllRows();
+   }
+
+   function getColumns($pv_table){
+      if (!$pv_table){
+         echo __CLASS__.": Debe ingresar el nombre de la tabla para mostrar las columnas";
+         return false;
+      }
+
+      $this->query("SHOW COLUMNS FROM $pv_table");
+      return $this->getAllRows();
+   }
+
+   function setHost ($pv_host) {$this->iv_host  = $pv_host;}
+   function setUser ($pv_user) {$this->iv_user  = $pv_user;}
+   function setPwd  ($pv_pwd)  {$this->iv_pwd   = $pv_pwd;}
+   function setBase ($pv_base) {$this->iv_base  = $pv_base;}
+   function setConId($pv_conid){$this->iv_conid = $pv_conid;}
+   function setResId($pv_resid){$this->iv_resid = $pv_resid;}
+
+   function getHost (){return $this->iv_host;}
+   function getUser (){return $this->iv_user;}
+   function getPwd  (){return $this->iv_pwd;}
+   function getBase (){return $this->iv_base;}
+   function getConId(){return $this->iv_conid;}
+   function getResId(){return $this->iv_resid;}
+}
+?>

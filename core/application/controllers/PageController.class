@@ -1,0 +1,249 @@
+<?php
+class PageController extends Controller {
+   protected $_tplHandler;
+   protected $_langHandler;
+
+   public function __construct() {
+      parent::__construct();
+
+      $this->_tplHandler = TemplateHandler::getInstance();
+      $this->_langHandler= LanguageHandler::getInstance();
+      
+      if (!isset($this->_avoid_set_template) || !$this->_avoid_set_template) {
+         if (get_class($this) != 'PageController') {
+            $className    = get_class($this);
+            echo $templateName = strtolower(substr($className, 0, strpos($className,'Controller')));
+
+            if (SystemHandler::getInstance()->isDefinedView($templateName)) {
+               $this->_tplHandler->useTemplate($templateName);
+            } else ErrorHandler::getInstance()->showError('not-found');
+         }
+      }
+
+      $this->_handleAuthentication();
+      $this->_handleInternationalization();
+   }
+
+   protected function _handleAuthentication() {
+      $authInfo = $tokenInfo = false;
+
+      if ($this->_currentPageUnderAuth()) {
+         ////// RECOVER REMEMBER-ME SESSION IF EXISTS AND CHECK IF IT'S VALID //////
+         $keepData   = SecurityHandler::getInstance()->validateKeepSession();
+         $keepStatus = $keepData['status'];
+         $keepInfo   = $keepData['info'];
+   
+         /// If keep session is invalid / disabled / incorrect ... show error and stop process
+         if ($keepStatus == -1) {
+            ErrorHandler::getInstance()->showError('security-alert-keep-differ');
+         }
+         elseif ($keepStatus == -2) {
+            ErrorHandler::getInstance()->showError('security-alert-keep-missing');
+         }
+   
+         ////// IF THERE ARE AN ACTIVE SESSION //////
+         if ( SecurityHandler::getInstance()->sessionExists() ) {
+            SecurityHandler::getInstance()->startSession();
+   
+            $authInfo = SecurityHandler::getInstance()->getFromSession('authInfo');
+            $authInfo = unserialize($authInfo);
+   
+            switch($keepStatus) {
+               // If keep session is in use and is valid, restore it (new token asigned)
+               // and restore session life time
+               case 1:
+                  SecurityHandler::getInstance()->restoreKeepSession();
+                  SecurityHandler::getInstance()->registerInSession('authLastActivity', time());
+                  break;
+            
+               // If Keep cookie unset or Keep session is disabled, only must check normal session
+               case 0:
+               case 2:
+                  //---- Checking inactivity elapsed time (if there isn't a keep session) -------//
+   
+                  $lastActivity= SecurityHandler::getInstance()->getFromSession('authLastActivity');
+                  $elapsedTime = time() - $lastActivity; // elapsed time in seconds
+   
+                  // If allowed inactivity time was exceed, current session is destroyed   
+                  // If not, current session remains and last activity is updated
+                  if ($elapsedTime > (RF_AUTH_MAXINACT * 60))
+                       SecurityHandler::getInstance()->destroySession();
+                  else SecurityHandler::getInstance()->registerInSession('authLastActivity', time());
+                  
+                  break;
+            }
+         }
+         ///// IF NO SESSION IS DEFINED ///// 
+         else {
+            /** Checking if 'remember me' cookie was set to auto-log 'remembered' user **/
+            if (is_array($keepInfo) && !empty($keepInfo)) {
+               $authInfo = $usuModel->getBasicData($keepInfo['id_usuario']);
+               $authInfo = $authInfo[0];
+               
+               SecurityHandler::getInstance()->startSession();
+               SecurityHandler::getInstance()->registerInSession('authInfo', serialize($authInfo));
+               SecurityHandler::getInstance()->registerInSession('authLastActivity', time());
+               $authInfo = $usuInfo;
+            }
+         }
+   
+         ///// if user is logged in, then current header is displayed
+         if (!empty($authInfo) && is_array($authInfo)) {
+            $this->_tplHandler->loadSnippetInto('snpt_header_logged_in', 'header');
+            $this->_showShortcutsFor($authInfo);
+         }
+         ///// if not, then is redirected to authentication page
+         else {
+            SecurityHandler::getInstance()->startSession();
+            SecurityHandler::getInstance()->registerInSession('authReferrerPage', $_SERVER['REQUEST_URI']);
+            
+            header('Location: '.AUTHPAGE);
+            exit;
+         }
+         ///// if current page dont need authentication, then single header is render (if it's neccesary) & continue
+      }
+      else {
+         if (!$this->_avoid_header)
+         $this->_tplHandler->loadSnippetInto('snpt_header_logged_out', 'header');
+      }
+   }
+
+   protected function _showShortcutsFor($authInfo) {
+      $this->_tplHandler->setVariable('user_name'   , $authInfo['first_name'].' '.$authInfo['last_name']);
+      $this->_tplHandler->setVariable('user_profile', $authInfo['shortname']);
+      $this->_tplHandler->setVariable('user_thumb'  , getUserThumbPath($authInfo['id']));
+   }
+
+   protected function _currentPageUnderAuth() {
+      global $g_authAvoidPages;
+
+      $url_mapping = RouterHandler::getInstance()->getMapping();
+      $currPage = $_SERVER['REQUEST_URI'];
+      $isFree = false;
+
+      foreach ($g_authAvoidPages as $mappingPos) {
+         $pattern = '\/'.$url_mapping[$mappingPos]['pattern'];
+
+         preg_match('/^'.$pattern.'$/', $currPage, $arrMatches);
+
+         if (!empty($arrMatches)) {
+            $isFree = true;
+            break;
+         }
+      }
+
+      return !$isFree;
+   }
+
+   protected function _handleInternationalization() {
+      $authInfo = SecurityHandler::getInstance()->getFromSession('authInfo');
+      $authInfo = unserialize($authInfo);
+      $langInfo = translate_info();
+
+      $idiomaModel = new IdiomaModel();
+      $idiomasArr  = $idiomaModel->selectBy();
+
+      foreach($idiomasArr as $idiomaData) {
+         if ($idiomaData['code'] == $langInfo['curr']) {
+            $this->_tplHandler->setVariable('language_curr_flag', $idiomaData['code']);
+            $this->_tplHandler->setVariable('language_curr_name', $idiomaData['display']);
+         }
+         else {
+            $this->_tplHandler->setVariable('language_code', $idiomaData['code']);
+            $this->_tplHandler->setVariable('language_name', $idiomaData['display']);
+            $this->_tplHandler->appendBlock('languages');
+         }
+      }
+   }
+
+   protected function _getParentOf($currProc, $procArr) {
+      foreach ($procArr as $procInfo) {
+         //echo "-->" . $procInfo['shortname'];
+
+         if (isset($procInfo['items'])) {
+            $isChild = $this->_getParentOf($currProc, $procInfo['items']);
+
+            if ($isChild)
+            return $procInfo['shortname'];
+         }
+         elseif ($currProc == $procInfo['shortname']) {
+            return true;
+         }
+         else {
+            return false;
+         }
+      }
+   }
+
+   public function showMainMenu($currProc=false) {
+      $userModel  = new UserModel();
+      $procModel  = new ProcessModel();
+
+      $procArr    = $procModel->getInMainMenu();
+      $parentCode = $this->_getParentOf($currProc, $procArr);
+
+      foreach ($procArr as $procInfo) {
+         $optClasses = array();
+         $itemAttributes = $attrList = array();
+         $itemCaret = false;
+
+         if ($userModel->hasPermissionFor($procInfo['shortname'])) {
+            //echo "<BR>$currProc // ". $procInfo['shortname'];
+
+            if ($currProc == $procInfo['shortname']) {
+               $optClasses[] = 'active';
+
+               if (!empty($procInfo['url']))
+               $this->_tplHandler->setConstant('DEFAULTPAGE', $procInfo['url']);
+            }
+
+            if (!empty($procInfo['items'])) {
+               $optHref = '#';
+               $optClasses[] = 'dropdown';
+               $itemAttributes['class'] = array('dropdown-toggle');
+               $itemAttributes['data-toggle'] = array('dropdown');
+
+               $caretObj = HtmlHandler::createElement('span');
+               $caretObj->setAttribute('class', 'caret');
+               $itemCaret = $caretObj->getHTML();
+
+               $this->_tplHandler->emptyRenderedBlock('items');
+
+               foreach ($procInfo['items'] as $itemId => $itemInfo) {
+                  $this->_tplHandler->setVariable('item_href', $itemInfo['url']);
+                  $this->_tplHandler->setVariable('item_text', $itemInfo['label']);
+                  $this->_tplHandler->appendBlock('items');
+               }
+
+               foreach($itemAttributes as $attr => $values) {
+                  $attrList[] = "$attr = \"". implode(' ', $values) ."\"";
+               }
+            }
+            else {
+               $optHref = $procInfo['url'];
+            }
+
+            $this->_tplHandler->setVariable('option_css', ((!empty($optClasses)) ? 'class="'.implode(' ',$optClasses).'"' : '') );
+            $this->_tplHandler->setVariable('option_label_href', $optHref );
+            $this->_tplHandler->setVariable('option_label_attr', implode(' ',$attrList) );
+            $this->_tplHandler->setVariable('option_label_text', $procInfo['label'] );
+            $this->_tplHandler->setVariable('option_label_caret',$itemCaret );
+            $this->_tplHandler->appendBlock('options');
+         }
+      }
+   }
+
+   public function renderStatic($pagename) {
+      $langInfo = translate_info();
+      $pageView = str_replace('-','_', $pagename).'_'. $langInfo['curr'];
+
+      if (!$this->_tplHandler->existsTemplate($pageView)) {
+         ErrorHandler::getInstance()->showError('not-found');
+         return;
+      }
+
+      $this->showMainMenu();
+
+      $this->_tplHandler->useTemplate($pageView);
+   }
+}

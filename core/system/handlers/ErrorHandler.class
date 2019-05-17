@@ -1,0 +1,131 @@
+<?php
+class ErrorHandler {
+   private $_errors;
+   public static $instance;
+   public $status = '';
+
+   private function __construct() {
+      if (is_file(RM_CORE_CONFIGPATH .'errors.conf')) {
+         include (RM_CORE_CONFIGPATH .'errors.conf'); 
+
+         $this->_setErrors($errors);
+      }
+   }
+
+   public static function getInstance() {
+      if (!isset(self::$instance)) {
+         self::$instance = new ErrorHandler();
+      }
+
+      return self::$instance;
+   }
+
+   private function _setErrors($errors) {
+      $this->_errors = $errors;
+   }
+
+   private function _replaceParameters($errorArr, $parameters=FALSE) {
+      foreach ($errorArr as $elem_key=>$elem_value) {
+         if (is_array($elem_value)) {
+            $errorArr[$elem_key] = $this->_replaceParameters($elem_value, $parameters);
+         }
+         else {
+            if (is_array($parameters)) {
+               foreach ($parameters as $key=>$value) {
+                  $key++;
+                  $elem_value = str_replace("%$key", $value, $elem_value);
+               }
+            }
+            else $elem_value = str_replace("%1", $parameters, $elem_value);
+
+            $errorArr[$elem_key] = replaceRTags($elem_value);
+         }
+      }
+
+      return $errorArr;
+   }
+
+   public function showError($errorName, $parameters=FALSE, $language=FALSE, $status=FALSE) {
+      $this->status = (!$status)? RM_ERR_FATAL : $status;
+
+      $language = ($language)?$language:RM_LANG_DEFAULT;
+      $protocol = (isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0');
+      $errorArr = $this->_errors[$language][$errorName];
+
+      if ($parameters)
+      $errorArr = $this->_replaceParameters($errorArr, $parameters);
+
+      $tplObj = TemplateHandler::getInstance();
+      $tplObj->cleanInstance();
+      
+      if (isset($errorArr['snippet'])) {
+         $tplObj->setSnippetAs('error_snippet', $errorArr['snippet']);
+      }
+
+      $tplObj->useTemplate('error');
+
+      $tplObj->setVariable('error_code', ($errorArr['hideCode'])?'':$errorArr['httpCode']);
+      $tplObj->setVariable('error_title', $errorArr['title']);
+      $tplObj->setVariable('error_description', $errorArr['description']);
+
+      if (isset($errorArr['actions']) && is_array($errorArr['actions'])) {
+         foreach($errorArr['actions'] as $accId=>$accVal) {
+            $tplObj->setVariable('error_action_title', $accId);
+
+            if (!is_array($accVal)) {
+               $accVal = array($accVal);
+            }
+
+            foreach ($accVal as $accElem) {
+               //---- es id o class
+               if (in_array(substr($accElem, 0,1),array('.','#'))) {
+                  if (substr($accElem, 0,1) == '.')
+                       $anchorParams['class'][] = substr($accElem, 1);
+                  else $anchorParams['id'] = substr($accElem, 1);
+               }
+               //---- sino se trata como URL
+               else {
+                  $anchorParams['href'] = $accElem;
+               }
+            }
+
+            $anchorParams['class'][] = 'btn';
+
+            $anchorElems[] = (isset($anchorParams['class']))?'class="'.implode(' ', $anchorParams['class']).'"' : '';
+            $anchorElems[] = (isset($anchorParams['id']))?'id="'.$anchorParams['id'].'"' : '';
+            $anchorElems[] = (isset($anchorParams['href']))?'href="'.$anchorParams['href'].'"' : '';
+
+            $tplObj->setVariable('error_action_parameters', ' '.implode(' ', $anchorElems));
+            $tplObj->appendBlock('error_actions', true);
+
+            unset($anchorParams);
+            unset($anchorElems);
+         }
+      }
+
+      $errorMsg  = (isset($errorArr['title']))?$errorArr['title']:$errorArr['description'];
+      header($protocol. ' '.$errorArr['httpCode'].' '.utf8_decode($errorMsg));
+   }
+
+   public function sendErrorHeader($errorName, $parameters=false, $language=false) {
+      $language = ($language)?$language:RM_LANG_DEFAULT;
+      $protocol = (isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0');
+      $errorArr = $this->_errors[$language][$errorName];
+
+      if ($parameters)
+      $errorArr = $this->_replaceParameters($errorArr,$parameters);
+
+      $errorMsg  = (isset($errorArr['title']))?$errorArr['title']:$errorArr['description'];
+      header($protocol. ' '.$errorArr['httpCode'].' '.utf8_decode($errorMsg));
+   }
+
+   public function getErrorData($errorName, $parameters=false, $language=false) {
+      $language = ($language)?$language:RM_LANG_DEFAULT;
+      $errorArr = $this->_errors[$language][$errorName];
+
+      if ($parameters)
+      $errorArr = $this->_replaceParameters($errorArr, $parameters);
+
+      return $errorArr;
+   }
+}

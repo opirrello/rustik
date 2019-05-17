@@ -1,0 +1,925 @@
+<?php
+
+/*
+ * class Template.
+ */
+
+class TemplateHandler {
+   private $_root = ".";
+   private $_source_blocks = array();
+   private $_parsed_blocks = array();
+   private $_child_blocks = array();
+   private $_variables = array();
+   private $_snippets = array();
+   private $_constants = array();
+   private $_base_template = '';
+   private $_other_templates = array();
+   private $_template_variables = array();
+   private $_parent_obj = false;
+   private $_strict_block = '';
+   private $_dump_content = '';
+   private $_dump_trace = '';
+   public $unknowns = "remove";  // "remove" | "comment" | "keep"
+   public static $instance;
+
+    /*
+     * Template([string $root], [string $unknowns]);
+     * Constructor. $root es el directorio donde se buscaran las plantillas(el
+     * directorio actual por defecto) y $unknowns especifica qué se debe hacer
+     * con las variables no definidas.
+     */
+   private function __construct($unknowns = "") {
+      $this->__setRoot(RM_CORE_VIEWPATH);
+      $this->__useTemplate(RM_VIEW_BASEFILE, RM_VIEW_BASEBLOCK);
+      $this->__setUnknowns($unknowns);
+
+      $this->_base_template = RM_VIEW_BASEFILE;
+   }
+
+   public static function getInstance($unknowns = "") {
+      if (empty(self::$instance)) {
+         self::$instance = new TemplateHandler($unknowns);
+      }
+
+      return self::$instance;
+   }
+
+   public function cleanInstance($unknowns = "") {
+      foreach($this->_other_templates as $tplname) {
+         $tplname = strtoupper($tplname);
+
+         if (isset($this->_source_blocks[$tplname]['childs']))
+              $childArr = $this->_source_blocks[$tplname]['childs'];
+         else $childArr = array();
+
+         foreach ($childArr as $child) {
+            $this->removeRenderedBlock($child);
+
+            if (isset($this->_template_variables[$child]) &&
+                is_array($this->_template_variables[$child])) {
+
+               foreach($this->_template_variables[$child] as $varname) {
+                  //echo "<BR>eliminando a $varname";
+                  unset($this->_variables[$varname]);
+               }
+            }
+         }
+
+         foreach($this->_template_variables[$tplname] as $varname) {
+            unset($this->_variables[$varname]);
+         }
+
+         $this->removeRenderedBlock($tplname);
+      }
+   }
+
+   /*
+   * void useTemplate(mixed $name, [string $filename]);
+   * Lee el fichero $filename y lo almacena en el bloque $name. Si $name es un
+   * vector se lee cada uno de los ficheros especificados de la forma
+   * array("name" => "filename", ...);.
+   */
+   public function useTemplate($template_name, $block_name=""){
+      $this->_other_templates[] = $template_name;
+      $this->__useTemplate($template_name, $block_name);
+   }
+
+   public function useStrictTemplate($template_name, $block_name=""){
+      $this->_other_templates[] = $template_name;
+      $this->__useTemplate($template_name, $template_name);
+      $this->_strict_block = $template_name;
+   }
+
+   private function __useTemplate($template_name, $block_name="") {
+      $block_name = (empty($block_name))?strtoupper($template_name):strtoupper($block_name);
+
+      if (!$this->existsTemplate($template_name)){
+         MessengerHandler::getInstance()->getMessage('inexistent-template', $template_name, RM_ERR_WARNING);
+      }
+
+      $this->__extractBlocks($block_name, $template_name);
+   }
+
+   /*
+    * void set_root(string $root);
+    * Selecciona a $root como el directorio donde se buscarán las plantillas.
+    */
+   private function __setRoot($root) {
+      if (!is_dir($root)) {
+         MessengerHandler::getInstance()->getMessage('inexistent-directory', $root, RM_ERR_WARNING);
+         return false;
+      }
+      $this->root = $root;
+      return true;
+   }
+
+   public function existsTemplate($template_name) {
+      if (file_exists(RM_CORE_VIEWPATH . $template_name . ".". RM_VIEW_FILETYPE)){
+         return true;
+      }
+      
+      return false;
+   }
+
+    /*
+     * void set_block(mixed $parent, $handle, [string $name]);
+     * Esta función no hace nada. Solo está disponible por compatibilidad con
+     * PHPLib. Con Template no es necesaria ya que los bloques se extraen
+     * automáticamente y se almacenan en $this->blocks. Cuando un bloque es
+     * procesado, el resultado se almacena en $this->vars, de forma que pueda
+     * ser incluido en otro bloque como si fuera una variable normal.
+     */
+    public function rewriteBlock($parent, $content=false) {
+        if(isset($content)) {
+            $this->_source_blocks[$parent] = $content;
+        }
+    }
+
+    public function setSnippetAs($snpKey, $snpname) {
+       $this->_snippets[$snpKey] = $snpname;
+    }
+
+    public function loadSnippetInto($snptname, $varname) {
+       $this->__extractBlocks(strtoupper($varname), $snptname);
+       //$this->__parseBlock($varname, false);
+
+       //$content = $this->getRenderedBlock($varname);
+       //$this->removeRenderedBlock($varname);
+       //$this->setVariable($varname, $content);
+    }
+
+    public function setPagination($pageData, $extraData=false) {
+      $orderby = (empty($extraData['orderby']))?'':'_ob'.$extraData['orderby'];
+      $orient  = (empty($extraData['orient']))?'':strtolower($extraData['orient']);
+
+      $pgSerial = 'nr:'. $pageData['num_rows'].'::'.
+                  'np:'. $pageData['num_pages'].'::'.
+                  'rpp:'.$pageData['rows_per_page'].'::'.
+                  'ppg:'.$pageData['pages_per_group'].'::'.
+                  'cp:'. $pageData['curr_page'].'::'.
+                  'fp:'. $pageData['first_page'];
+
+      $this->setVariable('pagn_data', $pgSerial);
+
+      if (!isset($extraData['content_type']))
+      $extraData['content_type'] = '';
+
+      switch($extraData['content_type']) {
+         case 'link':
+            $link = HtmlHandler::createElement('a');
+            $base_lnk= RM_DOMAIN.$extraData['base_url']."/{$orderby}{$orient}_p";
+            break;
+
+         case 'label':
+            $label = HtmlHandler::createElement('label');
+            $base_lnk= "{$extraData['orderby']}:{$orient}";
+            break;
+      }
+
+      $firstGrp= $pageData['curr_page'];
+
+      if ($pageData['num_pages'] > $pageData['pages_per_group']){
+         $currGrp = ceil($pageData['curr_page'] / $pageData['pages_per_group']);
+         $cantGrp = ceil($pageData['num_pages'] / $pageData['pages_per_group']);
+      }
+      else{
+         $currGrp = 1;
+         $cantGrp = 1;
+      }
+
+      $indic = $pageData['curr_page'] * $pageData['pages_per_group'];
+      $limit = ($indic > $pageData['num_pages']) ? $indic - $pageData['num_pages'] : $pageData['pages_per_group'];
+
+      $lastPage = $pageData['num_pages'];
+      $firstPage= $pageData['first_page'];
+      $nextPage = $currGrp * $pageData['pages_per_group'] + 1;
+      $prevPage = ($currGrp - 2) * $pageData['pages_per_group'] + 1;
+
+      //------ if is NOT the first group of pages, prev/first must be set as ON 
+      if ($currGrp != 1){
+         switch($extraData['content_type']) {
+            case 'link':
+               $link->emptyContent();
+               $link->setAttribute('href', $base_lnk.$firstPage);
+               $link->setAttribute('rel' , $firstPage);
+               $link->addContent(RM_PAGN_FIRSTCONT);
+               $firstHtml = $link->getHTML();
+
+               $link->emptyContent();
+               $link->setAttribute('href', $base_lnk.$prevPage);
+               $link->setAttribute('rel' , $prevPage);
+               $link->addContent(RM_PAGN_PREVCONT);
+               $prevHtml = $link->getHTML();
+               break;
+
+            case 'label':
+               $label->emptyContent();
+               $label->setAttribute('rel', "$base_lnk:$firstPage");
+               $label->addContent(RM_PAGN_FIRSTCONT);
+               $firstHtml = $label->getHTML();
+
+               $label->emptyContent();
+               $label->setAttribute('rel', "$base_lnk:$prevPage");
+               $label->addContent(RM_PAGN_PREVCONT);
+               $prevHtml = $label->getHTML();
+               break;
+
+            default:
+               $firstHtml= $firstPage;
+               $prevHtml = $prevPage;
+         }
+
+         $this->setVariable('pagn_first_html', $firstHtml);
+         $this->setVariable('pagn_prev_html' , $prevHtml);
+         $this->setVariable('pagn_first_off' , '');
+         $this->setVariable('pagn_prev_off'  , '');
+      }
+      //------ if is the first group of pages, prev/first must be set as OFF
+      else { 
+         switch($extraData['content_type']) {
+            case 'link':
+            case 'label':
+               $firstHtml= RM_PAGN_FIRSTCONT;
+               $prevHtml = RM_PAGN_PREVCONT;
+               break;
+
+            default:
+               $firstHtml= '';
+               $prevHtml = '';
+         }
+         
+         $this->setVariable('pagn_first_html', $firstHtml);
+         $this->setVariable('pagn_prev_html' , $prevHtml);
+         $this->setVariable('pagn_first_off' , RM_PAGN_OFFSTYLE);
+         $this->setVariable('pagn_prev_off'  , RM_PAGN_OFFSTYLE);
+      }
+
+      //------ if is NOT the last group of pages, next/last must be set as ON
+      if ($currGrp != $cantGrp){
+         switch($extraData['content_type']) {
+            case 'link':
+               $link->emptyContent();
+               $link->setAttribute('href',$base_lnk.$lastPage);
+               $link->setAttribute('rel',$lastPage);
+               $link->addContent(RM_PAGN_LASTCONT);
+               $lastHtml = $link->getHTML();
+   
+               $link->emptyContent();
+               $link->setAttribute('href',$base_lnk.$nextPage);
+               $link->setAttribute('rel',$nextPage);
+               $link->addContent(RM_PAGN_NEXTCONT);
+               $nextHtml = $link->getHTML();
+               break;
+
+            case 'label':
+               $label = HtmlHandler::createElement('label');
+               $label->setAttribute('rel',"$base_lnk:$lastPage");
+               $label->addContent(RM_PAGN_LASTCONT);
+               $lastHtml = $label->getHTML();
+   
+               $label->emptyContent();
+               $label->setAttribute('rel',"$base_lnk:$nextPage");
+               $label->addContent(RM_PAGN_NEXTCONT);
+               $nextHtml = $label->getHTML();
+               break;
+
+            default:
+               $lastHtml = $lastPage;
+               $nextHtml = $nextPage;
+         }
+
+         $this->setVariable('pagn_last_html'  , $lastHtml);
+         $this->setVariable('pagn_next_html'  , $nextHtml);
+         $this->setVariable('pagn_last_off', '');
+         $this->setVariable('pagn_next_off' , '');
+      }
+      //------ if is the last group of pages, next/last must be set as OFF
+      else { 
+         switch($extraData['content_type']) {
+            case 'link':
+            case 'label':
+               $lastHtml = RM_PAGN_LASTCONT;
+               $nextHtml = RM_PAGN_NEXTCONT;
+               break;
+
+            default:
+               $lastHtml = '';
+               $nextHtml = '';
+         }
+         
+         $this->setVariable('pagn_last_html', $lastHtml);
+         $this->setVariable('pagn_next_html', $nextHtml);
+         $this->setVariable('pagn_last_off',  RM_PAGN_OFFSTYLE);
+         $this->setVariable('pagn_next_off',  RM_PAGN_OFFSTYLE);
+      }
+
+      /*-----------------------------------------------------------------------------
+      Seteando pagina "landing" para c/grupo de paginas (1ro., ant., sig. y ult.)
+      -----------------------------------------------------------------------------*/
+      if ($pageData['num_pages'] > 1){
+         for($page = 0; $page < $pageData['num_pages']; $page++){
+            if (ceil(($page+1)/$pageData['pages_per_group']) == $currGrp){
+               if (($page + 1) == $pageData['curr_page']) {
+                  $this->setVariable('pagn_page_curr','current');
+                  $this->setVariable("pagn_page_html",$page+1);
+               }
+               else {
+                  $this->setVariable('pagn_page_curr','');
+
+                  switch($extraData['content_type']) {
+                     case 'link':
+                     $link->emptyContent();
+                     $link->setAttribute('href',$base_lnk.($page+1));
+                     $link->setAttribute('rel',$page+1);
+                     $link->addContent($page+1);
+                     $pageHtml = $link->getHTML();
+                     break;
+                  
+                     case 'label':
+                     $label->emptyContent();
+                     $label->setAttribute('rel',"$base_lnk:".($page+1));
+                     $label->addContent($page+1);
+                     $pageHtml = $label->getHTML();
+                     break;
+
+                     default:
+                     $pageHtml = $page+1;
+                  }
+
+                  $this->setVariable("pagn_page_html",$pageHtml);
+               }
+      
+               $this->appendBlock("pagn_pages");
+            }
+         }
+
+         // If there exists pages to list, current pagination block is rendered
+         $this->writeBlock("pagination");
+      }
+    }
+
+    public function setParentObj($parentObj) {
+       $this->_parent_obj = $parentObj;
+    }
+
+    /*
+     * void setVariable(mixed $var, [string $value]);
+     * Registra el valor $value como $var. Si $var es un vector de la forma
+     * array("var"=>"value) entonces todo el vector es registrado.
+     */
+    public function setVariable($variable, $value = "") {
+        if (defined('RM_ENCODING')) {
+           if (!mb_detect_encoding($value, RM_ENCODING, true)) {
+              $value = mb_convert_encoding($value, RM_ENCODING);
+           }
+        }
+
+        if(is_array($variable)) {
+            for(reset($variable); list($k, $v) = each($variable); )
+                $this->_variables[$k] = $v;
+        } else {
+            $this->_variables[$variable] = $value;
+        }
+    }
+
+    public function setConstantAdHoc($constname, $constvalue) {
+       $this->_constants[$constname] = $constvalue;
+    }
+
+    public function setConstant($constname, $constvalue=false) {
+       if (empty($constvalue)) 
+       $constvalue = constant($constname);
+
+       $this->_constants[$constname] = $constvalue;
+    }
+
+    private function __hasChilds($blockname) {
+       return is_array($this->_source_blocks[$blockname]['childs']);
+    }
+
+    private function __parseSubBlocksOf($blockname) {
+       $source_block = $this->_source_blocks[$blockname]['body'];
+
+       if ($this->__hasChilds($blockname)) {
+          foreach ($this->_source_blocks[$blockname]['childs'] as $child) {
+             /*if (empty($this->_parsed_blocks[$child])) {
+                $this->__parseBlock($child);
+             }*/
+
+
+             $source_block = str_replace("%%$child%%", $this->_parsed_blocks[$child], $source_block); 
+          }
+       }
+
+       return $source_block;
+    }
+
+    function appendBlock($blockname) {
+       $this->__parseBlock($blockname, true);
+    }
+
+    function writeBlock($blockname) {
+       $this->__parseBlock($blockname, false);
+    }
+
+    function existsBlock($blockname) {
+       return isset($this->_source_blocks[$blockname]);
+    }
+
+    private function __parseBlock($blockname, $append = false) {
+        $blockname = strtoupper($blockname);
+
+        if (isset($this->_source_blocks[$blockname])) {
+           $parsed_block = $this->__parseSubBlocksOf($blockname);
+
+           $arr_variables = $this->_variables;
+
+           /// replacing variables
+           foreach ($arr_variables as $varname => $varvalue) {
+              $parsed_block = preg_replace("/\{$varname\}/i", $varvalue, $parsed_block);
+           }
+
+           /// using templateVars as hash parameters for RTags
+           preg_match_all('/#([\w]+)#/', $parsed_block, $arr_setvars);
+
+           if (!empty($arr_setvars) && !empty($arr_setvars[1])) {
+              foreach ($arr_setvars[1] as $key=>$varname) {
+                 $params[] = $this->_variables[$varname];
+                 $parsed_block = str_replace("#$varname#", "#".($key+1), $parsed_block);
+              }
+           }
+           
+           $parsed_block = replaceRTags($parsed_block, $params);
+
+           if ($append)
+                $this->_parsed_blocks[$blockname].= $parsed_block;
+           else $this->_parsed_blocks[$blockname] = $parsed_block;
+
+           switch($this->unknowns) {
+              case "keep":
+                break;
+
+              case "comment":
+                $this->_parsed_blocks[$blockname] = preg_replace('/{(.+)}/', "<!-- UNDEF: \\1 -->", $this->_parsed_blocks[$blockname]);
+                break;
+
+              case "remove":
+              default:
+                $this->_parsed_blocks[$blockname] = preg_replace('/{\w+}/', "", $this->_parsed_blocks[$blockname]);
+                break;
+           }
+        }
+        else {
+           MessengerHandler::getInstance()->getMessage('inexistent-block', $blockname, RM_ERR_NORMAL);
+        }
+
+        return $this->_parsed_blocks[$blockname];
+    }
+
+    private function _getTraceOf($prop, $varNames) {
+       $varFound = array();
+
+       foreach($varNames as $varname) {
+          $varTraceArr = explode(':', $varname);
+
+          if ($varTraceArr[0] == $prop) {
+             $varFound[] = $varname;
+          }
+       }
+
+       return $varFound;
+    }
+
+    private function _traceRealValueOf($elem, $trace) {
+       $traceArr = explode(':', $trace);
+
+       array_shift($traceArr);
+
+       if (!empty($traceArr))
+            $qualifier = $traceArr[0];
+       else $qualifier = false;
+
+       if (is_array($elem) && $qualifier !== false) {
+          if (array_key_exists($qualifier, $elem))
+               return $this->_traceRealValueOf($elem[$qualifier], implode(':', $traceArr));
+          else MessengerHandler::getInstance()->getMessage('incorrect-qualifier-index', $qualifier, RM_ERR_WARNING);
+       }
+       else if (is_object($elem)) {
+          $objClass = get_class($elem);
+          $objProps = get_class_vars($objClass);
+          $esProp = false;
+
+          foreach($objProps as $property) {
+             if ($qualifier == $property) {
+                $esProp = true;
+                break;
+             }
+          }
+
+          if ($esProp)
+               return $this->_traceRealValueOf($elem->$qualifier, implode(':', $traceArr));
+          else MessengerHandler::getInstance()->getMessage('inexistent-qualifier-property', $qualifier, RM_ERR_WARNING);
+       }
+       else {
+          if (!$qualifier)
+               return $elem;
+          else MessengerHandler::getInstance()->getMessage('improper-qualifier-value', $qualifier, RM_ERR_WARNING);
+       }
+
+       return false;
+    }
+
+    public function render($destiny = 'toScreen') {
+       ///// If there exists a parent object conected, then this handler will check for
+       ///// variables and blocks related with parent object properties
+       if ($this->_parent_obj) {
+          $varNames = array_keys($this->_variables);
+          $blkNames = array_keys($this->_source_blocks);
+          $varMatch = false;
+
+          foreach ($this->_parent_obj as $nameProp=>$valueProp) {
+             ///--------- procesing property as basic template variable ----------------
+             // finding template variables matching with this property
+             $varMatch = $this->_getTraceOf($nameProp, $varNames);
+
+             if (!empty($varMatch)) {
+                foreach ($varMatch as $match) {
+                   $varCont = $this->_traceRealValueOf($valueProp, $match);
+
+                   $this->setVariable($match, $varCont);
+                }
+             }
+
+             ///--------- procesing property as template block -------------
+             ///        (only for arrays with primary valuetype) 
+             if (is_array($valueProp) || is_object($valueProp)) {
+                foreach($blkNames as $blockname) {
+                   if (strtolower($blockname) == strtolower($nameProp)) {
+                      foreach($valueProp as $key=>$value) {
+                         if (is_string($value) || is_numeric($value)) {
+                            if (in_array($nameProp."_value", $varNames))
+                            $this->setVariable($nameProp."_value", $value);
+
+                            if (in_array($nameProp."_key", $varNames))
+                            $this->setVariable($nameProp."_key", $value);
+
+                            $this->appendBlock($nameProp);
+                         }
+                      }
+                   }
+                }
+             }
+          }
+       }
+
+       if (!empty($this->_strict_block)) {
+          $this->__parseBlock($this->_strict_block);
+
+          if ($destiny == 'asResult')
+               $result = $this->printRenderedBlock($this->_strict_block, 'asResult');
+          else $this->printRenderedBlock($this->_strict_block);
+
+          $this->emptyRenderedBlock($this->_strict_block);
+          $this->_strict_block = '';
+
+          if (!empty($result)) {
+             return $result;
+          }
+          else return;
+       }
+
+       $source_blocks_list = array_keys($this->_source_blocks);
+
+       foreach ($source_blocks_list as $source_block) {
+          if (!in_array($source_block, array_keys($this->_parsed_blocks)))
+          $this->__parseBlock($source_block);
+       }
+
+       $original = $this->_parsed_blocks[RM_VIEW_BASEBLOCK];
+       $content  = '';
+
+       foreach ($this->_parsed_blocks as $blockname => $blockinfo) {
+          if ($this->__isChild($blockname) || $blockname == RM_VIEW_BASEBLOCK ) {
+             continue;
+          }
+          else {
+             $content .= $this->_parsed_blocks[$blockname];
+          }
+       }
+
+       $original = str_replace(RM_VIEW_BASECONTENT, $content, $original);
+       $original = str_replace(RM_VIEW_MAINTITLE, RM_MAINTITLE, $original);
+       $original = str_replace(RM_VIEW_SEOTITLE, RM_SEOTITLE, $original);
+       $original = str_replace(RM_VIEW_DUMPCONTENT, $this->__setDumpContent(), $original);
+
+       foreach ($this->_constants as $const=>$value) {
+          //$original = str_replace("%%".strtoupper($const)."%%", $value, $original);
+          $jsconst[]= "var ".strtoupper($const). " = '$value'";
+       }
+
+       $jsconst = "\n<script type=\"text/javascript\">\n".
+                  implode(";\n", $jsconst).';'.
+                  "\n</script>\n";
+       $original= str_replace('</head>', "$jsconst</head>", $original);
+
+
+       $this->_parsed_blocks[RM_VIEW_BASEBLOCK] = $original;
+       
+       if ($destiny == 'asResult')
+            return $this->_parsed_blocks[RM_VIEW_BASEBLOCK];
+       else print $this->_parsed_blocks[RM_VIEW_BASEBLOCK];
+    }
+
+    /*
+     * int p(string $block);
+     * Imprime el bloque especificado por $block.
+     */
+    function printRenderedBlock($blockname, $destiny = 'toScreen') {
+       $blockname = strtoupper($blockname);
+ 
+       if ($destiny == 'asResult')
+            return $this->_parsed_blocks[$blockname];
+       else print($this->_parsed_blocks[$blockname]);
+    }
+
+    /*
+     * int o(string $block);
+     * Regresa el contenido del bloque especificado por $block.
+     */
+    function getRenderedBlock($blockname) {
+        $blockname = strtoupper($blockname);
+        return $this->_parsed_blocks[$blockname];
+    }
+
+    /*
+     * int blank(string $block);
+     * Borra el contenido del bloque especificado por $block.
+     */
+    function emptyRenderedBlock($blockname) {
+        $blockname = strtoupper($blockname);
+        $this->_parsed_blocks[$blockname] = false;
+    }
+
+    function removeRenderedBlock($blockname) {
+        $blockname = strtoupper($blockname);
+        unset($this->_parsed_blocks[$blockname]);
+        unset($this->_source_blocks[$blockname]);
+    }
+
+    /*
+     * void scan_globals(void);
+     * Escanea los contenidos de las variables globales y las almacena como
+     * G_X donde X es el nombre de la variable.
+     */
+    function scan_globals() {
+        for(@reset($GLOBALS); list($k, $v) = @each($GLOBALS); ) {
+            $this->vars["{G_".$k."}"] = $v;
+        }
+    }
+
+
+    /*
+     * int getVariables(void);
+     * Regresa un vector con las variables.
+     */
+    function getVariables() {
+        return $this->_variables;
+    }
+
+    /*
+     * string get_var(string $varname);
+     * Regresa el contenido de la variable $varname. Si $varname es un arreglo
+     * regresa otro con los valores de las mismas.
+     */
+    function getVariable($varname) {
+        if(is_array($varname)) {
+            for(reset($varname); list(,$k) = each($varname); )
+                $result[$k] = $this->_variables[$k];
+            return $result;
+        } else {
+            return $this->_variables[$varname];
+        }
+    }
+
+    /*
+     * int blank(string $block);
+     * Borra el contenido del bloque especificado por $block.
+     */
+    function emptyVariable($varname) {
+        if (is_array($varname)) {
+           for (reset($varname); list(,$k) = each($varname); )
+               $this->_variables[$k] = false;
+        }
+        else {
+           $this->_variables[$varname] = false;
+        }
+    }
+
+    function isVariable($varname){
+       return isset($this->_variables[$varname]);
+    }
+
+    function isEmptyVariable($varname){
+       return empty($this->_variables[$varname]);
+    }
+
+    function isEmptyBlock($block){
+       return empty($this->_variables[$block]);
+    }
+    /*
+     * string get(string $varname);
+     * Regresa el contenido de $varname.
+     */
+    function get($varname) {
+        return $this->_variables[$varname];
+    }
+
+    /*
+     * void set_unknowns(enum $unknowns);
+     * Especifica qué se debe hacer con las variables no definidas. Puede ser
+     * uno de "remove"(Eliminar), "comment"("Comentar") o "keep"(Eliminar).
+     */
+    private function __setUnknowns($unknowns = "keep") {
+        $this->unknowns = $unknowns;
+    }
+
+    private function __isChild($blockname) {
+       if (isset($this->_child_blocks[$blockname])) {
+          return $this->_child_blocks[$blockname];
+       }
+
+       return false;
+    }
+
+/* private: */
+
+    /*
+     * string loadFile(string $filename);
+     * Regresa el contenido del fichero especificado por $filename.
+     */
+    function loadFile($template_name) {
+        $template_name = trim($template_name);
+        $template_name = str_replace("-->","",$template_name);
+        $template_name = str_replace("<!--","",$template_name);
+
+        $filename = $template_name .".". RM_VIEW_FILETYPE;
+
+        if (filesize($this->root . $filename) === 0) {
+            MessengerHandler::getInstance()->getMessage('template-empty', $this->root . $filename, RM_ERR_WARNING);
+        }
+
+        if(($fh = fopen($this->root . $filename, "r"))) {
+            $file_content = fread($fh, filesize($this->root . $filename));
+            fclose($fh);
+        } else {
+            MessengerHandler::getInstance()->getMessage('cant-open-template', $this->root . $filename, RM_ERR_WARNING);
+        }
+        return $file_content;
+    }
+
+    /*
+     * void __extractBlocks(string $name, string $block);
+     * Extrae los bloques de $block y los almacena en el bloque $name.
+     */
+    function __extractBlocks($block_name, $template_name) {
+        $level = 0;
+        $raw_template = $this->loadFile($template_name);
+        $current_block = $block_name;
+        $template_blocks = explode("<!-- ", $raw_template);
+
+        if (list(, $block) = @each($template_blocks)) {
+            if (isset($this->_source_blocks[$current_block]))
+                 $this->_source_blocks[$current_block]['body'].= $block;
+            else $this->_source_blocks[$current_block]['body'] = $block;
+
+            preg_match_all('/{([\_\/\.\w:0-9]*)}/', $block, $found_vars);
+
+            if (!empty($found_vars[1])) {
+               foreach($found_vars[1] as $varname) {
+                  $this->_template_variables[$current_block][] = $varname;
+                  $this->setVariable($varname,'');
+               }
+            }
+
+            while(list(, $block) = @each($template_blocks)) {
+               $block = rtrim($block);
+               /// searching variables in each block
+               preg_match_all('/{([\_\/\.\w:0-9]*)}/', $block, $found_vars);
+
+               if (!empty($found_vars[1])) {
+                  foreach($found_vars[1] as $varname) {
+                     $this->_template_variables[$current_block][] = $varname;
+                     $this->setVariable($varname,'');
+                  }
+               }
+
+                preg_match('/^(SNIPPET|BEGIN|END) ([{}\w-\_\/\.0-9]*) -->(.*)$/s', $block, $regs);
+
+                if (!isset($regs[1])) $regs[1] = "";
+
+                switch($regs[1]) {
+                    case "SNIPPET":
+                        $snpKey = $regs[2];
+
+                        if (strpos($snpKey,'{') !== false) {
+                           $snpKey = str_replace('{','',$snpKey);
+                           $snpKey = str_replace('}','',$snpKey);
+      
+                           $snippet = $this->_snippets[$snpKey];
+                        }
+                        else $snippet = $regs[2];
+
+                        if (!empty($snippet))
+                        $this->__extractBlocks($current_block, $snippet);
+
+                        $this->_source_blocks[$current_block]['body'] .= $regs[3];
+                        break;
+
+                    case "BEGIN":
+                        $this->_source_blocks[$current_block]['body'] .= "%%".strtoupper($regs[2])."%%";
+                        $this->_source_blocks[$current_block]['childs'][] = strtoupper($regs[2]);
+                        $this->_child_blocks[strtoupper($regs[2])] = true;
+      
+                        $block_names[$level++] = $current_block;
+                        $current_block = strtoupper($regs[2]);
+      
+                        if (isset($this->_source_blocks[$current_block]))
+                             $this->_source_blocks[$current_block]['body'].= rtrim($regs[3]);
+                        else $this->_source_blocks[$current_block]['body'] = rtrim($regs[3]);
+                        break;
+
+                    case "END":
+                        $current_block = $block_names[--$level];
+                        if (isset($this->_source_blocks[$current_block]))
+                             $this->_source_blocks[$current_block]['body'].= rtrim($regs[3]);
+                        else $this->_source_blocks[$current_block]['body'] = rtrim($regs[3]);
+                        break;
+
+                    default:
+                        $this->_source_blocks[$current_block]['body'].= "<!-- $block";
+                        break;
+                }
+
+                unset($regs);
+            }
+        }
+    }
+
+    function addJsFiles($filename, $customPath=false, $customProp=false){
+       $jsvers = (!$customPath && defined('RM_VIEW_VERSIONFILE') && RM_VIEW_VERSIONFILE) ? "?".filemtime(RM_CORE_JSPATH . $filename):"";
+       $jsprop = ($customProp) ? " $customProp":'';
+       $jspath = ($customPath) ? $customPath . $filename : RM_CORE_JSURL . $filename . $jsvers;
+       $jspath = '<script type="text/javascript" src="'.$jspath.'"'.$jsprop.'></script>'; 
+
+       if (!$this->isEmptyVariable("js_files"))
+            $this->setVariable("js_files",$this->getVariable("js_files")."\n".$jspath);
+       else $this->setVariable("js_files",$jspath);
+    }
+
+    function addJsScript($jscode){
+       $jscode = "\n".'<script type="text/javascript">'."\n".$jscode."\n".'</script>'."\n";
+
+       if (!$this->isEmptyVariable("js_scripts"))
+            $this->setVariable("js_scripts",$this->getVariable("js_scripts")."\n".$jscode,true);
+       else $this->setVariable("js_scripts",$jscode);
+    }
+
+    public function addCssFiles($csspath, $customPath=false, $customProp=false){
+       $cssvers = (defined('RM_VIEW_VERSIONFILE') && RM_VIEW_VERSIONFILE) ? "?".filemtime(RM_CORE_CSSPATH . $csspath):"";
+       $cssprop = ($customProp) ? " $customProp":'';
+       $csspath = ($customPath) ? $customPath . $csspath : RM_CORE_CSSURL . $csspath . $cssvers;
+       $csspath = '<link href="'.$csspath.'" rel="stylesheet" type="text/css"'.$cssprop.'>';
+
+       if (!$this->isEmptyVariable("css_files"))
+            $this->setVariable("css_files",$this->getVariable("css_files")."\n".$csspath);
+       else $this->setVariable("css_files",$csspath);
+    }
+
+    public function setDump($html, $trace=false) {
+       if (!empty($trace) && is_array($trace)) 
+            $trace = '<ul><li>'.implode('</li><li>', $trace).'</li></ul>';
+       else $trace = 'Sin informacion';
+
+       $this->_dump_content.= $html;
+       $this->_dump_trace = $trace;
+    }
+
+    public function __setDumpContent() {
+       if (!empty($this->_dump_content))
+       return
+       "<div id='dump-floating'>".
+       "<div id='alin'>".
+       "<div id='controls'>".
+       "<a id='put-left'><<</a><a id='put-right'>>></a><a id='show-hide'>-</a>".
+       "<a id='get-info'>?</a>".
+       "</div>".
+       "<div id='info'>".
+       $this->_dump_trace.
+       "</div>".
+       $this->_dump_content.
+       "</div>".
+       "</div>";
+    }
+};
+
+?>

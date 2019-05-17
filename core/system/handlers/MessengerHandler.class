@@ -1,0 +1,51 @@
+<?php
+class MessengerHandler {
+   private $messages;
+   public static $instance;
+
+   private function __construct() {
+      if (is_file(RM_CORE_CONFIGPATH .'messages.conf')) {
+         include (RM_CORE_CONFIGPATH .'messages.conf'); //this include retrieve the array $url_mapping
+
+         $this->__setMessages($messages);
+      }
+   }
+
+   public static function getInstance() {
+      if (!isset(self::$instance)) {
+         self::$instance = new MessengerHandler();
+      }
+
+      return self::$instance;
+   }
+
+   private function __setMessages($messages) {
+      $this->messages = $messages;
+   }
+
+   public function getMessage($message_key, $parameters=FALSE, $type=RM_ERR_NORMAL, $language=FALSE) {
+      $language = ($language)?$language:RM_LANG_DEFAULT;
+
+      $message = $this->messages[$language][$message_key];
+
+      if (is_array($parameters)) {
+         foreach ($parameters as $key=>$value) {
+            $key++;
+            $message = str_replace("%$key", $value, $message);
+         }
+      }
+      else $message = str_replace("%1", $parameters, $message);
+
+      $trace = debug_backtrace(FALSE);
+      $curr_trace = $trace[1];
+
+      $message = "{$curr_trace['class']}::{$curr_trace['function']}() # ". $message;
+
+      if ($type == RM_ERR_WARNING) {
+         die($message);
+      } 
+      else {
+         echo $message;
+      }
+   }
+}

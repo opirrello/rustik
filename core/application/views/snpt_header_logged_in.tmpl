@@ -1,0 +1,65 @@
+<div class="page-header page-header-inverse header-login">
+
+		<!-- Main navbar -->
+		<div class="navbar navbar-inverse navbar-transparent">
+			<div class="navbar-header">
+				<a class="navbar-brand" href="#"><img src="%C%RF_CORE_IMAGEURL%C%rustik-logo.png" alt=""></a>
+
+				<ul class="nav navbar-nav pull-right visible-xs-block">
+					<li><a data-toggle="collapse" data-target="#navbar-mobile"><i class="icon-grid3"></i></a></li>
+				</ul>
+			</div>
+
+			<div class="navbar-collapse collapse" id="navbar-mobile">
+				<p class="navbar-text"><span class="user-profile label bg-success-400">{user_profile}</span></p>
+
+				<div class="navbar-right">
+					<ul class="nav navbar-nav">
+						<li class="dropdown dropdown-user">
+							<a class="dropdown-toggle" data-toggle="dropdown">
+                        <div class="thumb thumb-rounded thumb-slide">
+								   <img src="{user_thumb}" alt="" class="img-circle img-responsive" style="height:100%">
+                        </div>
+								<span>{user_name}</span>
+								<i class="caret"></i>
+							</a>
+
+                     <!-- user actions -->
+							<ul class="dropdown-menu dropdown-menu-right">
+								<li><a href="#" id="user-profile"><i class="icon-user-plus"></i> My profile</a></li>
+								<li class="divider"></li>
+								<li><a href="#" id="user-edit"><i class="icon-cog5"></i> Account settings</a></li>
+								<li><a href="#" id="user-logout"><i class="icon-switch2"></i> Logout</a></li>
+							</ul>
+						</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+		<!-- /main navbar -->
+
+		<!-- Second navbar -->
+		<div class="navbar navbar-inverse navbar-transparent" id="navbar-second">
+         <!-- menu for mobile display -->
+			<ul class="nav navbar-nav visible-xs-block">
+				<li><a class="text-center collapsed" data-toggle="collapse" data-target="#navbar-second-toggle"><i class="icon-paragraph-justify3"></i></a></li>
+			</ul>
+
+         <!-- menu for desktop display -->
+			<div class="navbar-collapse collapse" id="navbar-second-toggle">
+				<ul class="nav navbar-nav navbar-nav-material">
+               <!-- BEGIN options -->
+               <li {option_css}>
+                  <a href="{option_label_href}" {option_label_attr}>{option_label_text} {option_label_caret}</a>
+						<ul class="dropdown-menu">
+                     <!-- BEGIN items -->
+                     <li><a href="{item_href}">{item_text}</a></li>
+                     <!-- END items -->
+                  </ul>
+               </li>
+               <!-- END options -->
+				</ul>
+			</div>
+		</div>
+		<!-- /second navbar -->
+	</div>

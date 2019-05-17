@@ -1,0 +1,242 @@
+<?php
+class XlsHandler {
+   private $_docType;
+   private $_excelObj;
+   static $_validDocTypes = array('Excel5:xls','Excel2007:xlsx');
+
+   private function __construct($docType) {
+      include RM_SYSLIBPATH."/phpexcel/PHPExcel.php";
+      include RM_SYSLIBPATH."/phpexcel/PHPExcel/Shared/String.php";
+      include RM_SYSLIBPATH."/phpexcel/PHPExcel/Autoloader.php";
+
+      PHPExcel_Autoloader::Load('PHPExcel_Cell');
+      PHPExcel_Autoloader::Load('PHPExcel_Exception');
+      PHPExcel_Autoloader::Load('PHPExcel_IComparable');
+      PHPExcel_Autoloader::Load('PHPExcel_IOFactory');
+      PHPExcel_Autoloader::Load('PHPExcel_WorksheetIterator');
+      PHPExcel_Autoloader::Load('PHPExcel_Calculation_Functions');
+      PHPExcel_Autoloader::Load('PHPExcel_Cell_IValueBinder');
+      PHPExcel_Autoloader::Load('PHPExcel_Cell_DefaultValueBinder');
+      PHPExcel_Autoloader::Load('PHPExcel_Cell_AdvancedValueBinder');
+      PHPExcel_Autoloader::Load('PHPExcel_Cell_DataType');
+      PHPExcel_Autoloader::Load('PHPExcel_Shared_Date');
+      PHPExcel_Autoloader::Load('PHPExcel_Calculation_Function');
+      PHPExcel_Autoloader::Load('PHPExcel_CalcEngine_CyclicReferenceStack');
+      PHPExcel_Autoloader::Load('PHPExcel_CalcEngine_Logger');
+      PHPExcel_Autoloader::Load('PHPExcel_Worksheet');
+      PHPExcel_Autoloader::Load('PHPExcel_Calculation');
+      PHPExcel_Autoloader::Load('PHPExcel_Settings');
+      PHPExcel_Autoloader::Load('PHPExcel_HashTable');
+      PHPExcel_Autoloader::Load('PHPExcel_CachedObjectStorageFactory');
+      PHPExcel_Autoloader::Load('PHPExcel_CachedObjectStorage_CacheBase');
+      PHPExcel_Autoloader::Load('PHPExcel_CachedObjectStorage_ICache');
+      PHPExcel_Autoloader::Load('PHPExcel_CachedObjectStorage_Memory');
+      PHPExcel_Autoloader::Load('PHPExcel_Worksheet_PageSetup');
+      PHPExcel_Autoloader::Load('PHPExcel_Worksheet_PageMargins');
+      PHPExcel_Autoloader::Load('PHPExcel_Worksheet_HeaderFooter');
+      PHPExcel_Autoloader::Load('PHPExcel_Worksheet_SheetView');
+      PHPExcel_Autoloader::Load('PHPExcel_Worksheet_Protection');
+      PHPExcel_Autoloader::Load('PHPExcel_Worksheet_RowDimension');
+      PHPExcel_Autoloader::Load('PHPExcel_Worksheet_ColumnDimension');
+      PHPExcel_Autoloader::Load('PHPExcel_Worksheet_AutoFilter');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_IWriter');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Abstract');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel5');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel2007');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_CSV');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel5_BIFFwriter');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel5_Parser');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel5_Workbook');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel5_Worksheet');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel5_Xf');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel5_Font');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel2007_WriterPart');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel2007_StringTable');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel2007_WriterPart');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel2007_ContentTypes');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel2007_DocProps');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel2007_Rels');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel2007_Theme');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel2007_Style');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel2007_Workbook');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel2007_Worksheet');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel2007_Drawing');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel2007_Comments');
+      PHPExcel_Autoloader::Load('PHPExcel_Writer_Excel2007_Chart');
+      PHPExcel_Autoloader::Load('PHPExcel_DocumentProperties');
+      PHPExcel_Autoloader::Load('PHPExcel_DocumentSecurity');
+      PHPExcel_Autoloader::Load('PHPExcel_Style_Supervisor');
+      PHPExcel_Autoloader::Load('PHPExcel_Style');
+      PHPExcel_Autoloader::Load('PHPExcel_Style_Font');
+      PHPExcel_Autoloader::Load('PHPExcel_Style_Color');
+      PHPExcel_Autoloader::Load('PHPExcel_Style_Fill');
+      PHPExcel_Autoloader::Load('PHPExcel_Style_Borders');
+      PHPExcel_Autoloader::Load('PHPExcel_Style_Border');
+      PHPExcel_Autoloader::Load('PHPExcel_Style_Alignment');
+      PHPExcel_Autoloader::Load('PHPExcel_Style_NumberFormat');
+      PHPExcel_Autoloader::Load('PHPExcel_Style_Protection');
+      PHPExcel_Autoloader::Load('PHPExcel_Shared_XMLWriter');
+      PHPExcel_Autoloader::Load('PHPExcel_Shared_Font');
+      PHPExcel_Autoloader::Load('PHPExcel_Shared_File');
+      PHPExcel_Autoloader::Load('PHPExcel_Shared_Drawing');
+      PHPExcel_Autoloader::Load('PHPExcel_Shared_OLE');
+      PHPExcel_Autoloader::Load('PHPExcel_Shared_OLE_PPS');
+      PHPExcel_Autoloader::Load('PHPExcel_Shared_OLE_PPS_Root');
+      PHPExcel_Autoloader::Load('PHPExcel_Shared_OLE_PPS_File');
+
+      if (self::__isValidDocType($docType)) {
+         $this->__setDocType($docType);
+      }
+      else die('El formato '.$docType.' no es un formato Excel '.strtoupper($element).' reconocido');
+   
+      PHPExcel_Cell::setValueBinder( new PHPExcel_Cell_AdvancedValueBinder() );
+      $this->_excelObj = new PHPExcel();
+   }
+
+   public static function createStyleSheet($docType=DEFAULT_XLS_FORMAT) {
+      return new XlsHandler($docType);
+   }
+
+   static function __isValidDocType($docType) {
+      $isValid = false;
+
+      foreach (self::$_validDocTypes as $typeInfo) {
+         list($type, $ext) = explode(':', $typeInfo);
+
+         if ($docType == $type) {
+            $isValid = true;
+            break;
+         }
+      }
+
+      return $isValid;
+   }
+
+   private function __setDocType($docType) {
+      $this->_docType = $docType;
+   }
+
+   private function __getDocType() {
+      return $this->_docType;
+   }
+
+   private function __getDocExt() {
+      $currExt = '';
+
+      foreach (self::$_validDocTypes as $typeInfo) {
+         list($type, $ext) = explode(':', $typeInfo);
+
+         if ($type == $this->__getDocType()) {
+            $currExt = $ext;
+            break;
+         }
+      }
+
+      return $currExt;
+   }
+
+   public function addTitles($titlesArr, $fontColor=false, $backColor=false) {
+      $colx = 0;
+
+      foreach ($titlesArr as $title) {
+         list($title, $size, $color, $bgcolor) = explode(':', $title);
+
+         /******** Defining BG color *********/
+         if (!empty($bgcolor))
+              $cellFill = $bgcolor;
+         elseif (!empty($backColor))
+              $cellFill = $backColor;
+         else $cellFill = 'ECECEC';
+
+         /******** Defining Font color *********/
+         if (!empty($color))
+              $cellColor = $color;
+         elseif (!empty($fontColor))
+              $cellColor = $fontColor;
+         else $cellColor = 'FFFFFF';
+
+         /******** Defining Cell size *********/
+         $cellSize = ($size) ? $size : false;
+
+         $this->_excelObj->getActiveSheet()->getStyleByColumnAndRow($colx,1)->getFont()->getColor()->setRGB($cellColor);
+         $this->_excelObj->getActiveSheet()->getStyleByColumnAndRow($colx,1)->getFill()->
+                setFillType(PHPExcel_Style_Fill::FILL_SOLID)->getStartColor()->setRGB($cellFill);
+         $this->_excelObj->getActiveSheet()->getStyleByColumnAndRow($colx,1)->getAlignment()->
+                setHorizontal(PHPExcel_Style_Alignment::HORIZONTAL_CENTER);
+         $this->_excelObj->getActiveSheet()->setCellValueByColumnAndRow($colx, 1, $title);
+
+         if (!empty($cellSize) && $cellSize != false)
+              $this->_excelObj->getActiveSheet()->getColumnDimensionByColumn($colx)->setwidth($cellSize);
+         else $this->_excelObj->getActiveSheet()->getColumnDimensionByColumn($colx)->setAutoSize(true);
+         $colx++;
+      }
+   }
+
+   public function addRows($rowsArr) {
+      $row = 0;
+
+      foreach ($rowsArr as $rowData) {
+         $col = 0;
+
+         foreach ($rowData as $cellContent) {
+            if (is_array($cellContent))
+                 list($value, $type) = $cellContent;
+            else list($value, $type) = array($cellContent,false);
+
+            switch ($type) {
+            case 'int':
+               $value = $value;
+               $dataType = PHPExcel_Cell_DataType::TYPE_NUMERIC;
+               break;
+
+            case 'char':
+            case 'varchar':
+            case 'text':
+            default:
+               $value = utf8_encode($value);
+               $dataType = PHPExcel_Cell_DataType::TYPE_STRING;
+               break;
+            }
+
+            $this->_excelObj->getActiveSheet()->setCellValueExplicitByColumnAndRow($col, $row+2, $value, $dataType);
+            $col++;
+         }
+         $row++;
+      }
+   }
+
+   public function sendTo($filename, $to='FILE') {
+      $outExt  = $this->__getDocExt();
+      $outFile = $filename.'.'.$outExt;
+
+      switch($to) {
+      case 'FILE':
+         $objWriter = PHPExcel_IOFactory::createWriter($this->_excelObj, $this->_docType);
+         $objWriter->save(RM_SERVERROOT.'/'.RM_TEMPORARYPATH.$outFile);
+         break;
+
+      case 'BROWSER':
+         ob_clean();
+         if ($outExt == 'xlsx') {
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+         }
+
+         if ($outExt == 'xls') {
+            header('Content-Type: application/vnd.ms-excel; charset=UTF-8;');
+         }
+
+         header('Content-Disposition: attachment; filename="'.$outFile.'"');
+         header('Content-Length: '.$outFile);
+         header('Pragma: ');
+         header('Cache-Control: max-age=0');  
+   
+         $objWriter = PHPExcel_IOFactory::createWriter($this->_excelObj, $this->_docType);
+         $objWriter->save('php://output');
+         unset($objWriter);
+         unset($this->_excelObj);
+         exit;
+         break;
+      }
+   }
+}
+

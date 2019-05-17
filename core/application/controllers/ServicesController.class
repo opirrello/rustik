@@ -1,0 +1,241 @@
+<?php
+class ServicesController extends Controller {
+   public function __construct() {
+      parent::__construct();
+   }
+
+   public function translateMessage() {
+      if (empty($_POST['message']))
+      return false;
+
+      return json_encode(array('message'=>translate($_POST['message'])));
+   }
+
+   public function getDictionary() {
+      $dicModel = new DictionaryModel();
+
+      if (empty($_POST['language']))
+           $langTo = (!empty($_SESSION['lang']))?$_SESSION['lang']:RF_LANG_DEFAULT;
+      else $langTo = $_POST['language'];
+
+      $textArr = $dicModel->selectBy(Array('frase_'.RF_LANG_DEFAULT.' AS text_key', "frase_$langTo AS translation"));
+      $dicArr  = array('language'=>$langTo, 'sentences'=>$textArr);
+
+      return json_encode($dicArr);
+   }
+
+   public function setLanguage() {
+      $langTo = false;
+
+      if (!empty($_POST['idioma'])) {
+         $langTo = $_POST['idioma'];
+
+         if (SecurityHandler::getInstance()->sessionExists()) {
+            SecurityHandler::getInstance()->startSession();
+
+            $authInfo = SecurityHandler::getInstance()->getFromSession('authInfo');
+            $authInfo = unserialize($authInfo);
+            $authInfo['codigo_idioma'] = $langTo;
+            SecurityHandler::getInstance()->registerInSession('authInfo', serialize($authInfo));
+
+            $userModel = new UsuarioModel();
+            $userModel->updateBy(array('codigo_idioma'=>$langTo), array($authInfo['id']));
+         }
+         else {
+            $cookiename = (defined('RF_LANG_COOKIE'))?RF_LANG_COOKIE:'RF_LANG';
+
+            $_COOKIE[$cookiename] = $langTo;
+            setcookie($cookiename, $langTo, time()+60*60*24*100, '/');
+         }
+
+         $langArr  = array('language'=>$langTo, 'success'=>true);
+         return json_encode($langArr);
+      }
+      return false;
+   }
+ 
+   public function getCaptcha() {
+      $captchaArr = SecurityHandler::getInstance()->captchaGenerate();
+      return json_encode($captchaArr);
+   }
+
+   public function getThumbnail($targetPath, $imgName, $w1, $w2, $type) {
+      if ( SecurityHandler::getInstance()->sessionExists() ) {
+         SecurityHandler::getInstance()->startSession();
+
+         $accId = $primId;
+         $qtnId = $auxId;
+
+         $authInfo = SecurityHandler::getInstance()->getFromSession('authInfo');
+         $authInfo = unserialize($authInfo);
+
+         if (!empty($authInfo) && is_array($authInfo)) {
+            $imgStruct[] = RF_DATAPATH;
+            $imgStruct[] = $targetPath;
+            $imgStruct[] = $imgName;
+         }
+         else return false;
+      }
+ 
+      $cant = func_num_args();
+
+      if ($cant > 1) {
+         $imgType = end(explode('.', $type));
+         $imgPath = implode('/', $imgStruct).".$imgType";
+         $imgDim  = getImageSize($imgPath);
+         $desType = func_get_arg(6);
+
+         $dimTxt = func_get_arg(4);
+         $dimTxt = trim($dimTxt, '-');
+         $dimArr = explode('-', $dimTxt);
+
+         list($toWidth, $toHeight, $cropWidth, $cropHeight) = $dimArr;
+
+         if (empty($toHeight) && empty($toWidth)) {
+            $toHeight = $imgDim[0];
+         }
+
+         if ($toHeight > 0){
+            $alto = $toHeight;
+            $prop = $imgDim[1]/$alto;
+            $ancho= $imgDim[0]/$prop;
+         }
+         else if ($toWidth > 0){
+            $ancho= $toWidth;
+            $prop = $imgDim[0]/$ancho;
+            $alto = $imgDim[1]/$prop;
+         }
+
+         if ($toHeight> 300) sleep(6);
+
+         if($imgType == 'jpeg') $imgType = 'jpg';
+
+         switch($imgType) {
+            case 'bmp': $imgRsc = imagecreatefromwbmp($imgPath); break;
+            case 'gif': $imgRsc = imagecreatefromgif($imgPath); break;
+            case 'jpg': $imgRsc = imagecreatefromjpeg($imgPath); break;
+            case 'png': $imgRsc = imagecreatefrompng($imgPath); break;
+            default : return "Unsupported picture type!";
+         }
+         
+         if ( $cropWidth || $cropHeight ) {
+            $anchoC = ($cropWidth>$ancho)?$ancho:$cropWidth;
+            $altoC  = ($cropHeight>$alto)?$alto:$cropHeight;
+            $xpos = (($ancho/2) - ($cropWidth/2)) - 1;
+            $ypos = (($alto/2) - ($cropHeight/2)) - 1;
+             
+            $thumbTmp = imagecreatetruecolor($ancho, $alto);
+            imagecopyresampled($thumbTmp, $imgRsc, 0, 0, 0, 0, $ancho, $alto, $imgDim[0], $imgDim[1]);
+
+            $thumbRsc = imagecreatetruecolor($anchoC, $altoC);
+            imagecopy($thumbRsc, $thumbTmp, 0, 0, $xpos, $ypos, $anchoC, $altoC);
+         }
+         else {
+            $thumbRsc = imagecreatetruecolor($ancho,$alto);
+            imagecopyresampled($thumbRsc, $imgRsc, 0, 0, 0, 0, $ancho, $alto, $imgDim[0], $imgDim[1]);
+         }
+
+         switch($desType){
+            case 'bmp':
+               header('Content-Type: image/vnd.wap.wbmp');
+               imagewbmp($thumbRsc);
+               break;
+
+            case 'gif':
+               header('Content-Type: image/gif');
+               imagegif($thumbRsc);
+               break;
+
+            case 'jpg': 
+               header('Content-Type: image/jpeg'); 
+               imagejpeg($thumbRsc);
+               break;
+
+            case 'png': 
+               header('Content-Type: image/png'); 
+               imagepng($thumbRsc); break;
+               break;
+         }
+
+         imagedestroy($thumbRsc);
+      }
+   }
+
+   public function getJSONSchema() {
+      if (empty($_POST['formname']))
+      return false;
+
+      if (!empty($_POST['parameters']) || $_POST['parameters'])
+           $parameters = $_POST['parameters'];
+      else $parameters = false;
+
+      $currJSON = FormHandler::getInstance()->getJSONForm($_POST['formname'], $parameters);
+
+      return $currJSON;
+   }
+
+   public function checkUserLogged($userAlias) {
+      if ( SecurityHandler::getInstance()->sessionExists() ) {
+         SecurityHandler::getInstance()->startSession();
+
+         $authInfo = SecurityHandler::getInstance()->getFromSession('authInfo');
+         $authInfo = unserialize($authInfo);
+
+         if (!empty($authInfo) && is_array($authInfo)) {
+            return json_encode(array('is_logged'=>true));
+         }
+      }
+
+      ErrorHandler::getInstance()->sendErrorHeader('action-need-logged-user');
+      $errorArr = ErrorHandler::getInstance()->getErrorData('action-need-logged-user');
+      return json_encode(array('is_logged'=>false,
+                               'message'=>array('title'=>$errorArr['title'],
+                                                'description'=>$errorArr['description'])));
+   }
+
+   public function downloadFile($targetPath, $imgName, $type) {
+      if ( SecurityHandler::getInstance()->sessionExists() ) {
+         SecurityHandler::getInstance()->startSession();
+
+         $accId = $primId;
+         $qtnId = $auxId;
+
+         $authInfo = SecurityHandler::getInstance()->getFromSession('authInfo');
+         $authInfo = unserialize($authInfo);
+
+         if (!empty($authInfo) && is_array($authInfo)) {
+            $imgStruct[] = RF_DATAPATH;
+            $imgStruct[] = $targetPath;
+            $imgStruct[] = $imgName;
+         }
+         else return false;
+      }
+
+      $filePath = implode('/', $imgStruct).".$type";
+      $fileType = func_get_arg(4);
+
+      header('Content-Description: File Transfer');
+      header('Content-Disposition: attachment; filename="'. "$imgName.$type" .'"');
+      header('Content-Transfer-Encoding: binary');
+      header('Expires: 0');
+      header('Cache-Control: must-revalidate, post-check=0, pre-check=0, no-store, no-cache');
+      header('Pragma: public');
+      header('Content-Length: ' . filesize($filePath));
+
+      switch($fileType){
+         case 'bmp': header('Content-Type: image/vnd.wap.wbmp'); break;
+         case 'gif': header('Content-Type: image/gif'); break;
+         case 'jpg': header('Content-Type: image/jpeg'); break;
+         case 'png': header('Content-Type: image/png'); break;
+      }
+
+      ob_clean();
+      flush();
+      readfile($filePath);
+      exit;
+   }
+
+   public function getMaxFileSize() {
+      return json_encode(array('maxsize'=>getMaxFileSize()));
+   }
+}

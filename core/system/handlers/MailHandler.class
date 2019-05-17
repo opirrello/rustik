@@ -1,0 +1,234 @@
+<?php
+class MailHandler {
+   public static $instance;
+   public $to = array();
+   public $html=false;
+   public $from;
+   public $fromname;
+   public $subject;
+   public $body;
+   public $attachments = array();
+   private $host = RM_MAIL_HOST;
+   private $port = RM_MAIL_PORT;
+   private $username = RM_MAIL_USERNAME;
+   private $password = RM_MAIL_PASSWORD;
+   private $smtp_secure = RM_MAIL_SMTP_SECURE;
+
+   private function __construct() {
+      include RM_CORE_SYSLIBPATH."/phpmailer/class.phpmailer.php";
+      //include RM_PHPMAILERPATH."class.phpmaileroauth.php";
+      //include RM_PHPMAILERPATH."class.phpmaileroauthgoogle.php";
+      include RM_CORE_SYSLIBPATH."/phpmailer/class.pop3.php";
+      include RM_CORE_SYSLIBPATH."/phpmailer/class.smtp.php";
+      //include RM_PHPMAILERPATH."get_oauth_token.php";
+
+      $mailer = new PHPMailer;
+      $this->_mailerObj = $mailer;
+   }
+
+   public static function getInstance() {
+      if (!isset(self::$instance)) {
+         self::$instance = new MailHandler();
+      }
+
+      return self::$instance;
+   }
+
+   public function isHTML($isHTML) {
+      $this->html = $isHTML;
+   }
+
+   public function useTemplate($tplname, $parameters) {
+      $tplObj = TemplateHandler::getInstance();
+
+      // Setting custom snippetnames 
+      foreach($parameters as $element => $content) {
+         $hashPos = strpos($element, '#');
+
+         if ($hashPos === false)
+         continue;
+
+         $tplObj->setSnippetAs( substr($element, $hashPos+1) , $content );
+      }
+
+      $tplObj->setParentObj($this);
+      $tplObj->useStrictTemplate($tplname);
+
+      // Setting custom variables and blocks
+      foreach($parameters as $element => $content) {
+         if (strpos('#', $element) !== false)
+         continue;
+
+         if (is_array($content)) {
+            if ($tplObj->existsBlock($element) && !empty($content)) {
+               foreach($content as $varname=>$value) {
+                  $tplObj->setVariable($varname, $value);
+                  $tplObj->appendBlock($element);
+               }
+            }
+         }
+         else {
+            $tplObj->setVariable($element, $content);
+         }
+      }
+
+      $this->body = $tplObj->render('asResult');
+      $this->html = true;
+   }
+
+   protected function _processMailerTagsIn($rTemplate) {
+      preg_match_all('/\[\[MH:([\w:0-9]+)\]\]/', $rTemplate, $mailerProps);
+
+      if (is_array($mailerProps) && isset($mailerProps[1]) && !empty($mailerProps[1])) {
+         foreach ($mailerProps[1] as $prop) {
+
+            $propStr = explode(":", $prop);
+            $propCnt = false;
+
+            $propName = $propStr[0];
+            $propValue= $this->$propName;
+
+            if (is_array($propValue)) {
+               if (sizeof($propStr) > 1 && is_numeric($propStr[1]) && is_int($propStr[1]*1) )
+                    $propCnt = $propValue[$propStr[1]];
+               else $propCnt = implode(RM_MAIL_SEPARATOR, $propValue);
+            }
+            else {
+               $propCnt = $propValue;
+            }
+
+            $rTemplate = str_replace("[[MH:$prop]]", $propCnt, $rTemplate);
+         }
+      }
+
+      return $rTemplate;
+   }
+
+   public function send($options=null) {
+      if (empty($this->to)) { die('No se ha definido ningun destinatario'); }
+
+      if (is_null($options)) {
+         if (defined('RM_MAIL_SMTP_OPTIONS')) {
+            $options = json_decode(RM_MAIL_SMTP_OPTIONS, true);
+         }
+
+         $this->_mailerObj->SMTPOptions = $options;
+      }
+
+      $this->_mailerObj->CharSet = (empty($this->charset))?RM_MAIL_ENCODING:$this->charset;
+      $this->_mailerObj->WordWrap = (empty($this->wordwrap))?RM_MAIL_WORDWRAP:$this->wordwrap;
+
+      $this->_mailerObj->Host = (empty($this->host))?RM_MAIL_HOST:$this->host;
+      $this->_mailerObj->Port = (empty($this->port))?RM_MAIL_PORT:$this->port;
+      $this->_mailerObj->Username = (empty($this->username))?RM_MAIL_USERNAME:$this->username;
+      $this->_mailerObj->Password = (empty($this->password))?RM_MAIL_PASSWORD:$this->password;
+
+      if (RM_MAIL_USESMTP)
+      $this->_mailerObj->IsSMTP();
+
+      $this->_mailerObj->SMTPAuth = true;
+      $this->_mailerObj->SMTPSecure = (empty($this->smtp_secure))?RM_MAIL_SMTP_SECURE:$this->smtp_secure;
+
+      /***** Setting mail type (plain/html) **********/
+      if ($this->html) {
+         $this->_mailerObj->msgHTML($this->body, RM_SERVERROOT);
+         $this->_mailerObj->isHTML(true);
+      }
+      else {
+         $this->_mailerObj->Body = strip_tags($this->body);
+         $this->_mailerObj->isHTML(false);
+      }
+
+      /***** Setting sender **********/
+      if (empty($this->from))
+           $this->_mailerObj->setFrom(RM_MAIL_FROM, RM_MAIL_FROMNAME);
+      else $this->_mailerObj->setFrom($this->from, $this->fromname);
+
+      /***** Setting destinations **********/
+      foreach($this->to as $dest) {
+         //---- find destination name
+         $openTag = strpos($dest, '<');
+
+         if ($openTag !== false) {
+            if (substr($dest, -1) != '>') {
+               die('El nombre de un destinatario esta mal declarado');
+            }
+            else {
+               $destaddr = trim(substr($dest, 0, $openTag-1));
+               $destname = trim(substr($dest, $openTag+1, -1));
+            }
+         }
+         else {
+            $destaddr = $dest;
+            $destname = '';
+         }
+
+         //---- cheking if is common address or Bcc/Cc
+         $openTag = strpos($dest, ':');
+
+         if ($openTag !== false) {
+            $addrType = strtolower(trim(substr($dest, 0, $openTag-1)));
+
+            switch($addType) {
+               case 'bcc':
+                  $this->_mailerObj->addBCC($destaddr, $destname);
+                  break;
+
+               case 'cc':
+                  $this->_mailerObj->addCC($destaddr, $destname);
+                  break;
+            }
+         }
+         else {
+            $this->_mailerObj->addAddress($destaddr, $destname);
+         }
+      }
+
+      /***** Setting subject **********/
+      $this->_mailerObj->Subject = $this->subject;
+
+      /***** adding attachments **********/
+      foreach($this->attachments as $filename) {
+         $this->_mailerObj->addAttachment($filename);
+      }
+
+      if (!$this->_mailerObj->send()) {
+         if (RM_ENVIRONMENT == 'development' || RM_ENVIRONMENT == 'testing')
+         MessengerHandler::getInstance()->getMessage('mail-error-sending', $this->_mailerObj->ErrorInfo, RM_ERR_WARNING);
+         return false;
+      }
+      else {
+         return true;
+      }
+   }
+
+   public function attach($filepath) {
+      $this->attachments[] = $filepath;
+   }
+
+   public function to() {
+      $numSenders = func_num_args();
+
+      for($i=0; $i<$numSenders; $i++) {
+         $this->to[] = func_get_arg($i);
+      }
+   }
+
+   public function from() {
+      $numPars = func_num_args();
+
+      $this->from = func_get_arg(0);
+
+      if ($numPars > 1) {
+         $this->fromname = func_get_arg(1);
+      }
+   }
+
+   public function subject($text) {
+      $this->subject = $text;
+   }
+
+   public function body($text) {
+      $this->body = $text;
+   }
+}

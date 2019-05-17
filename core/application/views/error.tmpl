@@ -1,0 +1,20 @@
+<div id="error-container" class="page-container with-shadow content-group">
+  <div class="page-content">
+    <div class="content-wrapper">
+      {minimal_header}
+      <div class="panel panel-flat text-center" style="position: static;">
+        <div class="panel-heading">
+            <h1 class="error-title">{error_code}</h1>
+            <h1>{error_title}</h1>
+            <p>{error_description}</p>
+            <div class="button-cont">
+               <!-- BEGIN error_actions -->
+               <a{error_action_parameters}>{error_action_title}</a>
+               <!-- END error_actions -->
+            </div>
+            <!-- SNIPPET {error_snippet} -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

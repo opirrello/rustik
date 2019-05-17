@@ -1,0 +1,42 @@
+<?php
+class KeepSessionModel extends Model {
+   protected $_primary_key = array('id');
+
+   public function createTokenFor($entId, $sel, $token) {
+      $qry = "INSERT INTO keep_session VALUES(NULL,?,?,?, NOW())";
+
+      $rollback = false;
+
+      $this->execute("BEGIN");
+      $added = $this->execute($qry, array($sel,$token,$entId));
+
+      if ($added == -1) {
+         $this->execute("ROLLBACK");
+         return false;
+      }
+      else {
+         $id =  $this->_dbhandler->getLastId();
+         $this->execute("COMMIT");
+         return $id;
+      }
+   }
+
+   public function updateTokenFor($sel, $token) {
+      $qry = "UPDATE keep_session SET token = ?, last_entry = ?  WHERE selector = ?";
+
+      $rollback = false;
+
+      $this->execute("BEGIN");
+
+      $edited = $this->execute($qry, array($token, 'NOW()', $sel));
+
+      if ($edited == -1) {
+         $this->execute("ROLLBACK");
+         return false;
+      }
+      else {
+         $this->execute("COMMIT");
+         return true;
+      }
+   }
+}

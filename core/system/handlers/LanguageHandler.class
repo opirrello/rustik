@@ -1,0 +1,54 @@
+<?php
+class LanguageHandler {
+   public static $instance;
+
+   private function __construct() {
+   }
+
+   public static function getInstance() {
+      if (!isset(self::$instance)) {
+         self::$instance = new LanguageHandler();
+      }
+
+      return self::$instance;
+   }
+
+   public function getCurrLanguage() {
+      if (SecurityHandler::getInstance()->sessionExists()) {
+         $authInfo = SecurityHandler::getInstance()->getFromSession('authInfo');
+         $authInfo = unserialize($authInfo);
+   
+         if (isset($authInfo['codigo_idioma'])) {
+            $currLang = $authInfo['codigo_idioma'];
+         }
+      }
+      elseif (defined('RM_LANG_COOKIE') && isset($_COOKIE[RM_LANG_COOKIE])) {
+         $currLang = $_COOKIE[RM_LANG_COOKIE];
+      }
+      elseif (defined('RM_LANG_DEFAULT')) {
+           $currLang = RM_LANG_DEFAULT;
+      }
+      else $currLang = 'es';
+
+      return $currLang;
+   }
+
+   public function t($textSource, $params=false) {
+      $diccModel = new DiccionarioModel();
+      $langTo = $this->getCurrentLanguage();
+   
+      $textArr = $diccModel->selectBy(Array('frase_'.RM_LANG_DEFAULT => $textSource),array('frase_'.$langTo));
+      $textArr = $textArr[0];
+   
+      $textDest = (is_array($textArr) && !empty($textArr))?$textArr['frase_'.$langTo]:$textSource;
+   
+      if (!empty($params) && is_array($params)) {
+         foreach($params as $key=>$par) {
+            $parnum = $key + 1;
+            $textDest = str_replace("#$parnum", $par, $textDest);
+         }
+      }
+
+      return $textDest;
+   }
+}

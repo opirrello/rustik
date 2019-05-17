@@ -1,0 +1,356 @@
+<?php
+final class SefHandler {
+   public function getUrlBusquedaPor($pv_type){
+      if (func_num_args() == 1) return false;
+      else{
+         for($lv_i=1; $lv_i<func_num_args(); $lv_i++){
+            $la_params[] = func_get_arg($lv_i);
+         }
+      }
+
+      switch($pv_type){
+         case "categoria":
+            $lv_url = PD_WEBROOT."/".getTrans("hospedajes")."/".self::getSefString($la_params[0]).
+                      (($la_params[1])?"/".Sef::getSefString($la_params[1]):"");
+            break;
+   
+         case "ubicacion":
+            $lv_url = PD_WEBROOT."/".getTrans("hospedajes")."/".self::getSefString("en ".$la_params[0]." ".$la_params[1]);
+            break;
+   
+         case "glosario":
+            $lv_url = PD_WEBROOT."/".getTrans("hospedajes")."/glosario/".self::getSefString($la_params[0]).".html";
+            break;
+      }
+
+      return $lv_url;
+   }
+
+   public function getUrlLugar($pv_id){
+      $la_data = getHospedaje($pv_id,"NEWCONN");
+      return PD_WEBROOT."/".getTrans("hospedajes")."/".self::getSefString($la_data['nombre'])."-lug$pv_id.html";
+   }
+
+   public function getUrlPhoto($pv_file, $pv_lugid){
+      $lv_imgtype   = substr($pv_file,-3);
+      $lv_imgname   = substr($pv_file,0,-4);
+
+      //return PD_WEBROOT."/fotos/$lv_imgtype/lug-$pv_lugid/".self::getSefString($lv_imgname);
+      return PD_WEBROOT."/fotos/$lv_imgtype/lug-$pv_lugid/".$lv_imgname;
+   }
+
+   public function getUrlThumbnail($pv_file, $pv_lugid, $pv_dim, $pv_crop=false){
+      $lv_imgtype   = substr($pv_file,-3);
+      $lv_imgname   = substr($pv_file,0,-4);
+
+      list($lv_alto, $lv_ancho) = explode(":",$pv_dim);
+
+      $lv_alto = ($lv_alto)?"/h$lv_alto":"";
+      $lv_ancho = ($lv_ancho)?"/w$lv_ancho":"";
+
+      //return PD_WEBROOT."/thumbnails/$lv_imgtype/lug-$pv_lugid/".self::getSefString($lv_imgname).$lv_alto.$lv_ancho.($pv_crop?"/crp$pv_crop":"");
+      return PD_WEBROOT."/thumbnails/$lv_imgtype/lug-$pv_lugid/".$lv_imgname.$lv_alto.$lv_ancho.($pv_crop?"/crp$pv_crop":"");
+   }
+
+   public function getUrlContacto(){
+      return PD_WEBROOT."/".self::getSefString(getTrans("contacto")).".html";
+   }
+
+   public function getUrlAmigos(){
+      return PD_WEBROOT."/".self::getSefString(getTrans("amigos")).".html";
+   }
+
+   public function getUrlFaqs(){
+      return PD_WEBROOT."/".self::getSefString(getTrans("FAQs")).".html";
+   }
+
+   public function getUrlPoliticas(){
+      return PD_WEBROOT."/".self::getSefString(getTrans("politicas")).".html";
+   }
+
+   public function getUrlTerminos(){
+      return PD_WEBROOT."/".self::getSefString(getTrans("terminos")).".html";
+   }
+
+   public function getUrlMenu($titulo){
+      return PD_WEBROOT."/".self::getSefString(getTrans($titulo)).".html";
+   }
+
+   public function getUrlColumnaPor($caja=false,$opcion){
+      if ($caja)
+           return PD_WEBROOT."/".self::getSefString(getTrans($caja))."/".self::getSefString(getTrans($opcion)).".html";
+      else return PD_WEBROOT."/".self::getSefString(getTrans($opcion)).".html";
+   }
+
+   public function getUrlClima($numero_dia=false){
+      if ($numero_dia)
+           return PD_WEBROOT."/".self::getSefString(getTrans("servicios"))."/".self::getSefString(getTrans("el clima online"))."-".self::getSefString(getTrans("dia"))."_".($numero_dia).".html";
+      else return PD_WEBROOT."/".Sef::getSefString(getTrans("servicios"))."/".Sef::getSefString(getTrans("el clima online")).".html";
+   }
+
+   public function getUrlVotar($pv_id){
+      $la_data = getHospedaje($pv_id,"NEWCONN");
+      return PD_WEBROOT."/".self::getSefString(getTrans("opinar sobre")." ".$la_data['nombre'])."-lug$pv_id.html";
+   }
+
+   public function getSefString($pv_string){
+      /******************************************************************
+       Entidades HTML
+      ******************************************************************/
+      $la_arrFrom[] = "–";                  $la_arrTo[] = "-";
+      $la_arrFrom[] = "&nbsp;";               $la_arrTo[] = "-";
+      $la_arrFrom[] = "&amp;";                $la_arrTo[] = "";
+      $la_arrFrom[] = "&iexcl;";              $la_arrTo[] = "-";
+      $la_arrFrom[] = "&agrave;";             $la_arrTo[] = "a";
+      $la_arrFrom[] = "&Agrave;";             $la_arrTo[] = "a";
+      $la_arrFrom[] = "&aacute;";             $la_arrTo[] = "a";
+      $la_arrFrom[] = "&Aacute;";             $la_arrTo[] = "a";
+      $la_arrFrom[] = "&acirc;";              $la_arrTo[] = "a";
+      $la_arrFrom[] = "&Acirc;";              $la_arrTo[] = "a";
+      $la_arrFrom[] = "&atilde;";             $la_arrTo[] = "a";
+      $la_arrFrom[] = "&Atilde;";             $la_arrTo[] = "a";
+      $la_arrFrom[] = "&aring;";              $la_arrTo[] = "a";
+      $la_arrFrom[] = "&Aring;";              $la_arrTo[] = "a";
+      $la_arrFrom[] = "&auml;";               $la_arrTo[] = "a";
+      $la_arrFrom[] = "&Auml;";               $la_arrTo[] = "a";
+      $la_arrFrom[] = "&acirc;";              $la_arrTo[] = "a";
+      $la_arrFrom[] = "&Acirc;";              $la_arrTo[] = "a";
+      $la_arrFrom[] = "&ccedil;";             $la_arrTo[] = "c";
+      $la_arrFrom[] = "&Ccedil;";             $la_arrTo[] = "c";
+      $la_arrFrom[] = "&egrave;";             $la_arrTo[] = "e";
+      $la_arrFrom[] = "&Egrave;";             $la_arrTo[] = "e";
+      $la_arrFrom[] = "&eacute;";             $la_arrTo[] = "e";
+      $la_arrFrom[] = "&Eacute;";             $la_arrTo[] = "e";
+      $la_arrFrom[] = "&euml;";               $la_arrTo[] = "e";
+      $la_arrFrom[] = "&Euml;";               $la_arrTo[] = "e";
+      $la_arrFrom[] = "&ecirc;";              $la_arrTo[] = "e";
+      $la_arrFrom[] = "&Ecirc;";              $la_arrTo[] = "e";
+      $la_arrFrom[] = "&igrave;";             $la_arrTo[] = "i";
+      $la_arrFrom[] = "&Igrave;";             $la_arrTo[] = "i";
+      $la_arrFrom[] = "&iacute;";             $la_arrTo[] = "i";
+      $la_arrFrom[] = "&Iacute;";             $la_arrTo[] = "i";
+      $la_arrFrom[] = "&icirc;";              $la_arrTo[] = "i";
+      $la_arrFrom[] = "&Icirc;";              $la_arrTo[] = "i";
+      $la_arrFrom[] = "&iuml;";               $la_arrTo[] = "i";
+      $la_arrFrom[] = "&Iuml;";               $la_arrTo[] = "I";
+      $la_arrFrom[] = "&ntilde;";             $la_arrTo[] = "n";
+      $la_arrFrom[] = "&Ntilde;";             $la_arrTo[] = "N";
+      $la_arrFrom[] = "&ograve;";             $la_arrTo[] = "o";
+      $la_arrFrom[] = "&Ograve;";             $la_arrTo[] = "o";
+      $la_arrFrom[] = "&oacute;";             $la_arrTo[] = "o";
+      $la_arrFrom[] = "&Oacute;";             $la_arrTo[] = "o";
+      $la_arrFrom[] = "&ocirc;";              $la_arrTo[] = "o";
+      $la_arrFrom[] = "&Ocirc;";              $la_arrTo[] = "o";
+      $la_arrFrom[] = "&ouml;";               $la_arrTo[] = "o";
+      $la_arrFrom[] = "&Ouml;";               $la_arrTo[] = "o";
+      $la_arrFrom[] = "&ugrave;";             $la_arrTo[] = "u";
+      $la_arrFrom[] = "&Ugrave;";             $la_arrTo[] = "u";
+      $la_arrFrom[] = "&uacute;";             $la_arrTo[] = "u";
+      $la_arrFrom[] = "&Uacute;";             $la_arrTo[] = "u";
+      $la_arrFrom[] = "&uuml;";               $la_arrTo[] = "u";
+      $la_arrFrom[] = "&Uuml;";               $la_arrTo[] = "u";
+      $la_arrFrom[] = "&ucirc;";              $la_arrTo[] = "u";
+      $la_arrFrom[] = "&Ucirc;";              $la_arrTo[] = "u";
+      $la_arrFrom[] = "&iquest;";             $la_arrTo[] = "-";
+      $la_arrFrom[] = "&quot;";               $la_arrTo[] = "-";
+      $la_arrFrom[] = "&apos;";               $la_arrTo[] = "-";
+      $la_arrFrom[] = "&ordf;";               $la_arrTo[] = "-";
+      $la_arrFrom[] = "\"";                   $la_arrTo[] = "-";
+      $la_arrFrom[] = "'" ;                   $la_arrTo[] = "-";
+      $la_arrFrom[] = "\n";                   $la_arrTo[] = "-";
+      $la_arrFrom[] = "\r";                   $la_arrTo[] = "-";
+      $la_arrFrom[] = "\t";                   $la_arrTo[] = "-";
+    
+      /******************************************************************
+       Caracteres ASCII especiales
+      ******************************************************************/
+      $la_arrFrom[] = "a";                    $la_arrTo[] = "a";
+      $la_arrFrom[] = "á";                    $la_arrTo[] = "a";
+      $la_arrFrom[] = "à";                    $la_arrTo[] = "a";
+      $la_arrFrom[] = "â";                    $la_arrTo[] = "a";
+      $la_arrFrom[] = "ã";                    $la_arrTo[] = "a";
+      $la_arrFrom[] = "å";                    $la_arrTo[] = "a";
+      $la_arrFrom[] = "ä";                    $la_arrTo[] = "a";
+      $la_arrFrom[] = "A";                    $la_arrTo[] = "a";
+      $la_arrFrom[] = "Á";                    $la_arrTo[] = "a";
+      $la_arrFrom[] = "À";                    $la_arrTo[] = "a";
+      $la_arrFrom[] = "Â";                    $la_arrTo[] = "A";
+      $la_arrFrom[] = "Å";                    $la_arrTo[] = "A";
+      $la_arrFrom[] = "Ä";                    $la_arrTo[] = "A";
+      $la_arrFrom[] = "Ã";                    $la_arrTo[] = "A";
+      $la_arrFrom[] = "e";                    $la_arrTo[] = "e";
+      $la_arrFrom[] = "é";                    $la_arrTo[] = "e";
+      $la_arrFrom[] = "è";                    $la_arrTo[] = "e";
+      $la_arrFrom[] = "ë";                    $la_arrTo[] = "e";
+      $la_arrFrom[] = "ê";                    $la_arrTo[] = "e";
+      $la_arrFrom[] = "E";                    $la_arrTo[] = "e";
+      $la_arrFrom[] = "È";                    $la_arrTo[] = "e";
+      $la_arrFrom[] = "É";                    $la_arrTo[] = "e";
+      $la_arrFrom[] = "Ë";                    $la_arrTo[] = "e";
+      $la_arrFrom[] = "Ê";                    $la_arrTo[] = "E";
+      $la_arrFrom[] = "í";                    $la_arrTo[] = "i";
+      $la_arrFrom[] = "ì";                    $la_arrTo[] = "i";
+      $la_arrFrom[] = "ï";                    $la_arrTo[] = "i";
+      $la_arrFrom[] = "î";                    $la_arrTo[] = "i";
+      $la_arrFrom[] = "Í";                    $la_arrTo[] = "i";
+      $la_arrFrom[] = "Ì";                    $la_arrTo[] = "i";
+      $la_arrFrom[] = "Ï";                    $la_arrTo[] = "i";
+      $la_arrFrom[] = "Î";                    $la_arrTo[] = "I";
+      $la_arrFrom[] = "ó";                    $la_arrTo[] = "o";
+      $la_arrFrom[] = "ò";                    $la_arrTo[] = "o";
+      $la_arrFrom[] = "ö";                    $la_arrTo[] = "o";
+      $la_arrFrom[] = "õ";                    $la_arrTo[] = "o";
+      $la_arrFrom[] = "ô";                    $la_arrTo[] = "o";
+      $la_arrFrom[] = "Ó";                    $la_arrTo[] = "o";
+      $la_arrFrom[] = "Ò";                    $la_arrTo[] = "o";
+      $la_arrFrom[] = "Ö";                    $la_arrTo[] = "o";
+      $la_arrFrom[] = "Ô";                    $la_arrTo[] = "O";
+      $la_arrFrom[] = "Õ";                    $la_arrTo[] = "O";
+      $la_arrFrom[] = "Ô";                    $la_arrTo[] = "O";
+      $la_arrFrom[] = "ú";                    $la_arrTo[] = "u";
+      $la_arrFrom[] = "ù";                    $la_arrTo[] = "u";
+      $la_arrFrom[] = "ü";                    $la_arrTo[] = "u";
+      $la_arrFrom[] = "û";                    $la_arrTo[] = "u";
+      $la_arrFrom[] = "Ú";                    $la_arrTo[] = "u";
+      $la_arrFrom[] = "Ü";                    $la_arrTo[] = "u";
+      $la_arrFrom[] = "Ù";                    $la_arrTo[] = "u";
+      $la_arrFrom[] = "Ú";                    $la_arrTo[] = "U";
+      $la_arrFrom[] = "Û";                    $la_arrTo[] = "U";
+      $la_arrFrom[] = "Û";                    $la_arrTo[] = "U";
+      $la_arrFrom[] = "ñ";                    $la_arrTo[] = "n";
+      $la_arrFrom[] = "Ñ";                    $la_arrTo[] = "N";
+      $la_arrFrom[] = "n";                    $la_arrTo[] = "n";
+      $la_arrFrom[] = "N";                    $la_arrTo[] = "n";
+      $la_arrFrom[] = "c";                    $la_arrTo[] = "c";
+      $la_arrFrom[] = "ç";                    $la_arrTo[] = "c";
+      $la_arrFrom[] = "C";                    $la_arrTo[] = "c";
+      $la_arrFrom[] = "Ç";                    $la_arrTo[] = "c";
+      $la_arrFrom[] = "l";                    $la_arrTo[] = "l";
+      $la_arrFrom[] = "L";                    $la_arrTo[] = "l";
+      $la_arrFrom[] = "s";                    $la_arrTo[] = "s";
+      $la_arrFrom[] = "S";                    $la_arrTo[] = "s";
+      $la_arrFrom[] = "z";                    $la_arrTo[] = "z";
+      $la_arrFrom[] = "Z";                    $la_arrTo[] = "z";
+      $la_arrFrom[] = "ß";                    $la_arrTo[] = "ss";
+      $la_arrFrom[] = "ÿ";                    $la_arrTo[] = "ij";
+      $la_arrFrom[] = "´";                    $la_arrTo[] = " ";
+      $la_arrFrom[] = "`";                    $la_arrTo[] = " ";
+      $la_arrFrom[] = "°";                    $la_arrTo[] = "";
+      $la_arrFrom[] = "’";                    $la_arrTo[] = "";
+      $la_arrFrom[] = "&";                    $la_arrTo[] = "";
+      $la_arrFrom[] = "©";                    $la_arrTo[] = "";
+      $la_arrFrom[] = "ç";                    $la_arrTo[] = "c";
+      $la_arrFrom[] = "Ç";                    $la_arrTo[] = "C";
+      $la_arrFrom[] = "/";                    $la_arrTo[] = "";
+      $la_arrFrom[] = "\\";                   $la_arrTo[] = "";
+      $la_arrFrom[] = ";";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = ",";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = ":";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = ".";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "*";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "+";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "(";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = ")";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "[";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "]";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "{";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "}";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "|";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "º";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "ª";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "¿";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "!";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "¡";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "$";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "#";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "%";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "¬";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "=";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "%";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "<";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = ">";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = '""';                   $la_arrTo[] = "";
+      $la_arrFrom[] = '"';                    $la_arrTo[] = "";
+      $la_arrFrom[] = " ";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "ª";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "€";                    $la_arrTo[] = "-";
+      $la_arrFrom[] = "&#128;";               $la_arrTo[] = "-";
+      $la_arrFrom[] = "%E2%82%AC";            $la_arrTo[] = "-";
+      $la_arrFrom[] = "%E2%82%AC";            $la_arrTo[] = "-";
+      $la_arrFrom[] = "«";                    $la_arrTo[] = "";
+      $la_arrFrom[] = "»";                    $la_arrTo[] = "";
+   
+      /******************************************************************
+       Alfabeto polaco
+       A ? B C   ? D E ? F G H I J K L ? M N ? O Ó P R S ? T U W Y Z ? ?
+       a ? b c ? d e ? f g h i j k l ? m n ? o ó p r s ? t u w y z ? ?
+      ******************************************************************/
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "a";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "a";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "e";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "e";
+      $la_arrFrom[] = "ó";                    $la_arrTo[] = "o";
+      $la_arrFrom[] = "Ó";                    $la_arrTo[] = "o";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "c";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "c";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "l";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "l";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "n";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "n";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "s";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "s";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "z";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "z";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "z";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "z";
+   
+      /******************************************************************
+       Alfabeto Turco - caracteres especiales
+       ? ç ? ? ? ? Ç ? ? ? ?
+      ******************************************************************/
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "g";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "g";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "G";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "I";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "i";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "S";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "s";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "s";
+      $la_arrFrom[] = "?";                    $la_arrTo[] = "S";
+   
+      $lv_cadena = str_replace($la_arrFrom, $la_arrTo, $pv_string);
+   
+   
+      /*****************************************************************
+       Reemplazos finales
+      *****************************************************************/
+      // Arreglo en cadena encodeada
+      $lv_cadena = urlencode($lv_cadena);
+      $lv_cadena = str_replace("%80", "-", "$lv_cadena");
+      $lv_cadena = str_replace("%", "-", "$lv_cadena");
+   
+      // Arreglos finales
+      $lv_cadena = ereg_replace("(_)+", "-", $lv_cadena);
+      $lv_cadena = ereg_replace("(--)+", "-", $lv_cadena);
+      $lv_cadena = strtolower($lv_cadena);
+   
+      //eliminacion del signo _ del principio
+      $lv_cadena = str_replace("_", " ", $lv_cadena);
+      $lv_cadena = trim($lv_cadena);
+      $lv_cadena = str_replace(" ", "-", $lv_cadena);
+   
+      if ((strlen(trim($lv_cadena)) > 0) && ($lv_cadena[strlen($lv_cadena) - 1] == "-")) {
+         $lv_cadena = substr($lv_cadena, 0, strlen($lv_cadena) - 1);
+      }
+      if ((strlen(trim($lv_cadena)) > 0) && ($lv_cadena[0] == "-")) {
+         $lv_cadena = substr($lv_cadena, 1, strlen($lv_cadena));
+      }
+   
+      $lv_cadena = str_replace("+", "_", $lv_cadena);
+      $lv_cadena = str_replace("d0", "", "$lv_cadena");
+   
+      return ($lv_cadena);
+   }
+}
+?>

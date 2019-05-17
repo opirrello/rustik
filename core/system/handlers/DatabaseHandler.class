@@ -1,0 +1,32 @@
+<?php
+class DataBaseHandler {
+   protected $_engineName = '';
+   protected $_requiredParams = '';
+   
+   public static function getInstanceOf($dbEngine=false) {
+      $dbEngine   = (!$dbEngine) ? DB_DEFAULTENG : $dbEngine;
+      $dbHandler  = ucfirst($dbEngine) . 'Handler';
+      $dbInstance = $dbHandler::getInstance();
+
+      return $dbInstance;
+   }
+
+   protected function __validateConfiguration() {
+      global $g_dbEngineParams;
+      
+      $params = $g_dbEngineParams[$this->_engineName];
+
+      foreach($this->_requiredParams as $par) {
+         if (!isset($g_dbEngineParams[$this->_engineName][$par])) {
+            echo __CLASS__.": Parametro $par sin declarar";
+            return false;
+         }
+         elseif (empty($g_dbEngineParams[$this->_engineName][$par])) {
+            echo __CLASS__.": Parametro $par sin valor definido";
+            return false;
+         }
+      }
+
+      return true;
+   }
+}

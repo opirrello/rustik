@@ -1,0 +1,16 @@
+<?php
+class Controller{
+   public $_errorHandler;
+
+   public function __construct() {
+      $this->_errorHandler = ErrorHandler::getInstance();
+   }
+
+   protected function _setParam($param, $value) {
+      $this->$param = $value;
+   }
+
+   protected function _getParam($param) {
+      return $this->$param;
+   }
+}

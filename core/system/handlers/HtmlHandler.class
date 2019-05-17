@@ -1,0 +1,170 @@
+<?php
+class HtmlHandler {
+   private $type;
+   private $content = '';
+   private $childNodes = array();
+   private $atributes = array();
+   static $_validTypes = array('i','s','h1','h2','h3','h4','h5','h6','em','strong','div','br','ul','li','ol','span','label','p','body','hr','table','tbody','tfoot','thead','tr','td','th','form','select','input','a','script','img');
+   static $_globalAttributes = array('id','class','style','align','alt','title','onclick','onkeydown','onkeypress','onkeyup','onmousedown','onmouseup','onmouseover','onmouseout','lang','translate');
+   
+   private function __construct($element) {
+      if (self::__isValidType($element)) {
+         $this->__setType($element);
+      }
+      else die('Elemento HTML '.strtoupper($element).' no reconocido');
+   }
+
+   public static function createElement($element) {
+      return new HtmlHandler($element);
+   }
+
+   private function __setType($type) {
+      $this->type = $type;
+   }
+
+   private function __getType() {
+      return $this->type;
+   }
+
+   private static function __isValidType($type) {
+      $type = strtolower(trim($type));
+
+      return in_array($type, self::$_validTypes);
+   }
+
+   private function __isValidAttribute($attribute) {
+      $curr_type = $this->__getType();
+      $specific_attr = array();
+      $standard_attr = self::$_globalAttributes;
+
+      switch ($curr_type) {
+      case "script":
+         $specific_attr = array('src','type');
+         $standard_attr = array();
+         break;
+
+      case "ol":
+         $specific_attr = array('start');
+         $standard_attr = array_slice($this->_globalAttributes,0,3); 
+         array_push($standard_attr, array_slice($this->_globalAttributes,4,12)); 
+         break;
+
+      case "ul":
+         $specific_attr = array('compact','type');
+         $standard_attr = array_slice($this->_globalAttributes,0,3); 
+         array_push($standard_attr, array_slice($this->_globalAttributes,4,12)); 
+         break;
+
+      case "select":
+         $specific_attr = array('onchange','onselect','selected','multiple');
+         break;
+
+      case "form":
+         $specific_attr = array('method','action','onsubmit');
+         break;
+
+      case "input":
+         $specific_attr = array('value','type','rel');
+         break;
+
+      case "table":
+         $specific_attr = array('width','height','cellspacing','cellpadding');
+         break;
+
+      case "td":
+         $specific_attr = array('colspan');
+         break;
+
+      case "a":
+         $specific_attr = array('href','rel','target');
+         break;
+
+      case "label":
+         $specific_attr = array('rel');
+         break;
+
+      case "img":
+         $specific_attr = array('src','width','height');
+         break;
+      }
+
+      $curr_attr = array_merge($standard_attr, $specific_attr);
+
+      return in_array(trim(strtolower($attribute)), $curr_attr);
+   }
+
+   private function __getTag() {
+      $curr_type = $this->__getType();
+
+      switch ($curr_type) {
+      case "br":
+         $tagArr['openTag'] = "<br%attributes%>";
+         break;
+
+      case "hr":
+         $tagArr['openTag'] = "<hr%attributes%/>";
+         break;
+
+      default:
+         $tagArr['openTag'] = "<$curr_type%attributes%>";
+         $tagArr['closeTag']= "</$curr_type>";
+      }
+
+      return $tagArr;
+   }
+
+   public function setAttribute($attribute, $value) {
+      if (!isset($this->type)) {
+         die('No se puede setear atributos a un elemento HTML sin tipo definido');
+      }
+
+      if ($this->__isValidAttribute($attribute)) {
+         $this->attributes[$attribute] = $value;
+      }
+      else{
+         die("$attribute no pertenece a los atributos permitidos para el elemento ".$this->_getType);
+      }
+   }
+
+   public function addContent($text) {
+      $this->content .= $text;
+   }
+
+   public function emptyContent() {
+      $this->content = '';
+   }
+
+   public function addElement($htmlObj) {
+      $this->childNodes[] = $htmlObj;
+   }
+
+   public function getHTML() {
+      $childNodesArr = $this->childNodes;
+
+      $tagArr = $this->__getTag();
+
+      $attArr = array();
+      $attributes = '';
+
+      if (!empty($this->attributes)) {
+         foreach($this->attributes as $attribute=>$value) {
+            $attArr[] = "$attribute=\"$value\"";
+         }
+
+         $attributes = " ".implode(" ",$attArr);
+      }
+
+      $tagArr['openTag'] = str_replace("%attributes%", $attributes, $tagArr['openTag']);
+
+      foreach ($childNodesArr as $htmlObj) {
+         if (is_object($htmlObj))
+         $HTMLContent .= $htmlObj->getHTML();
+      }
+
+      $HTMLContent .= $this->content;
+
+      $HTMLStr = $tagArr['openTag'].$HTMLContent.((!empty($tagArr['closeTag']))?$tagArr['closeTag']:'');
+
+      return $HTMLStr;
+   }
+}

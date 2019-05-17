@@ -1,0 +1,362 @@
+<?php
+class FormHandler {
+   public static $instance;
+
+   private function __construct() {
+   }
+
+   public static function getInstance() {
+      if (!isset(self::$instance)) {
+         self::$instance = new FormHandler();
+      }
+
+      return self::$instance;
+   }
+
+   private function __validateRestrictions($restrictions) {
+      foreach ($restrictions as $rest) {
+         switch ($rest) {
+         case 'auth':
+            if ( SecurityHandler::getInstance()->sessionExists() ) {
+               SecurityHandler::getInstance()->startSession();
+   
+               $authInfo = SecurityHandler::getInstance()->getFromSession('authInfo');
+               $authInfo = unserialize($authInfo);
+   
+               if (!empty($authInfo) && is_array($authInfo))
+                    $failed = false;
+               else $failed = true;
+            }
+            else $failed = true;
+
+            if ($failed) {
+               ErrorHandler::getInstance()->sendErrorHeader('action-need-logged-user');
+               $errorArr = ErrorHandler::getInstance()->getErrorData('action-need-logged-user');
+               echo json_encode(array('message'=>array('title'=>$errorArr['title'],
+                                                         'description'=>$errorArr['description'])));
+            }
+            break;
+         }
+
+         if ($failed)
+         return false;
+      }
+
+      return true;
+   }
+
+   private function __validateRule($formname, $rule, $checkval, $posted, $datatype) {
+      $isValid = true;
+
+      switch($rule) {
+         case 'required':
+            if (is_object($checkval)) {
+               eval('$mustCheck = ('.$checkval->depends.')?1:0;');
+
+               if ($mustCheck && empty($posted)) // is required
+               $isValid = false;
+            }
+            else {
+               if ($checkval && empty($posted)) // is required
+               $isValid = false;
+            }
+            break;
+
+         case 'minlength':
+            if ($checkval && !empty($posted)) {
+               if ($datatype == 'string') {
+                  $cantChars = strlen($posted);
+               }
+               elseif($datatype == 'number') {
+                  $cantChars = strlen(str_replace('.','',(string)$posted));
+               }
+   
+               if ($cantChars < $checkval)
+               $isValid = false;
+            }
+            break;
+
+         case 'maxlength':
+            if ($checkval && !empty($posted)) {
+               if ($datatype == 'string') {
+                  $cantChars = strlen($posted);
+               }
+               elseif($datatype == 'number') {
+                  $cantChars = strlen(str_replace('.','',(string)$posted));
+               }
+
+               if ($cantChars > $checkval)
+               $isValid = false;
+            }
+            break;
+
+         case 'digits':
+            if ($checkval && !empty($posted)) {
+               if (!is_numeric($posted))
+               $isValid = false;
+            }
+            break;
+
+         case 'email':
+            if ($checkval && !empty($posted)) {
+               if (!checkValidEmail($posted))
+               $isValid = false;
+            }
+            break;
+
+         case 'useralias':
+            if ($checkval && !empty($posted)) {
+               if (!checkValidUserAlias($posted))
+               $isValid = false;
+            }
+            break;
+
+         case 'apelative':
+            if ($checkval && !empty($posted)) {
+               if (empty($posted))
+               $isValid = false;
+            }
+            break;
+
+         case 'password':
+            if ($checkval && !empty($posted)) {
+               if (!checkValidPassword($posted))
+               $isValid = false;
+            }
+            break;
+
+         case 'equalTo':
+            $elemCompare = str_replace('#'.$formname.'-elt-', '', $checkval);
+            $valueCompare= $_POST[$elemCompare];
+
+            if ($valueCompare != $posted) {
+               $isValid = false;
+            }
+            break;
+			
+		 case 'textonly':
+            if ($checkval && !empty($posted)) {
+               if (!checkValidTextOnly($posted))
+               $isValid = false;
+            }
+            break;
+
+         default:
+            $isValid = customValidations($rule, $checkval, $posted);
+      }
+
+      return $isValid;
+   }
+
+   public function validateJSONForm($formname=false, $data=false, $params=false, $defaults=false, $newElements=false) {
+      $errorList  = array();
+      $jsonform   = FormHandler::getInstance()->getJSONForm($formname, $params, $defaults, $newElements, 'server');
+      $jsonform   = json_decode(utf8_encode($jsonform));
+      $validation = $jsonform->validation;
+      $schema     = $jsonform->schema;
+
+      if (!$formname && !$data)
+      return false;
+
+      foreach($schema as $field=>$fieldInfo) {
+         $schemas[$field] = $fieldInfo;
+      }
+
+      foreach($validation->rules as $field=>$ruleObj) {
+         $fields[] = $field;
+
+         foreach($ruleObj as $rule=>$value) {
+            $rules[$field][$rule] = $value;
+         }
+      }
+
+      foreach($validation->messages as $field=>$ruleObj) {
+         foreach($ruleObj as $rule=>$message) {
+            $messages[$field][$rule] = $message;
+         }
+      }
+
+      foreach($data as $field=>$posted) {
+         if (in_array($field, $fields)) {
+            $fieldRules = $rules[$field];
+            $fieldSchema= $schemas[$field];
+
+            foreach($fieldRules as $rule=>$checkval) {
+               $valid = $this->__validateRule($formname, $rule, $checkval, $posted, $fieldSchema->type);
+
+               if (!$valid) {
+                  $errorList[$field] = $messages[$field][$rule];
+               }
+            }
+         }
+      }
+
+      return $errorList;
+   }
+
+   public function addValidationFor(&$form, $validArr, $pos=0) {
+      if ($pos) {
+         $firstSub = array_slice($form['validation']['rules'], 0, $pos, true);
+         $lastSub  = array_slice($form['validation']['rules'], $pos, NULL, true);
+
+         $form['validation']['rules'] = array_merge($firstSub, $validArr['rules'], $lastSub);
+
+
+         $firstSub = array_slice($form['validation']['messages'], 0, $pos, true);
+         $lastSub  = array_slice($form['validation']['messages'], $pos, NULL, true);
+
+         $form['validation']['messages'] = array_merge($firstSub, $validArr['messages'], $lastSub);
+      }
+      else {
+         $firstSub = $form['validation']['rules'];
+         $form['validation']['rules'] = array_merge($firstSub, $validArr['rules']);
+
+         $firstSub = $form['validation']['messages'];
+         $form['validation']['messages'] = array_merge($firstSub, $validArr['messages']);
+      }
+   }
+
+   public function addSchemaFor(&$form, $schemaArr, $pos=0) {
+      if ($pos) {
+         $firstSub = array_slice($form['schema'], 0, $pos, true);
+         $lastSub  = array_slice($form['schema'], $pos, NULL, true);
+
+         $form['schema'] = array_merge($firstSub, $schemaArr, $lastSub);
+      }
+      else {
+         $firstSub = $form['schema'];
+         $form['schema'] = array_merge($firstSub, $schemaArr);
+      }
+   }
+
+   public function addFormElFor(&$form, $formArr, $pos=0, $into=false) {
+      if (!$into) {
+         if ($pos) {
+            $firstSub = array_slice($form['form'], 0, $pos, true);
+            $lastSub  = array_slice($form['form'], $pos, NULL, true);
+
+            $form['form'] = array_merge($firstSub, $formArr, $lastSub);
+         }
+         else {
+            $firstSub = $form['form'];
+            $form['form'] = array_merge($firstSub, $formArr);
+         }
+      }
+      else {
+         $auxForm = $form;
+
+         foreach($auxForm['form'] as $fieldIdx=>$fieldData) {
+            if (isset($fieldData['id']) && $fieldData['id'] == $into) {
+               $formIdx  = $fieldIdx;
+               $formElem = $form['form'][$fieldIdx]['items'];
+               break;
+            }
+         }
+
+         if ($formElem) {
+            if ($pos) {
+               $firstSub = array_slice($formElem, 0, $pos, true);
+               $lastSub  = array_slice($formElem, $pos, NULL, true);
+
+               $formElem = array_merge($firstSub, $formArr, $lastSub);
+            }
+            else {
+               $firstSub = $formElem;
+               $formElem = array_merge($firstSub, $formArr);
+            }
+
+            $form['form'][$formIdx]['items'] = $formElem;
+         }
+      }
+   }
+
+   public function getJSONForm($formname=false, $paramlist=false, $defaults=false, $newElements=false, $into=false, $method='render') {
+      global $regexPatterns;
+      global $mailAddresses;
+      global $forms;
+
+      if (empty($formname)) {
+         throw new Exception('Nombre de formulario vacio.'); 
+         die;
+      }
+      else if (!array_key_exists($formname, $forms)) {
+         throw new Exception('Nombre de formulario no registrado.'); 
+         die;
+      }
+      else {
+         if (!empty($newElements) && is_array($newElements)) {
+            if (!isAssociative($newElements)) {
+               foreach($newElements as $idx => $newElement) {
+                  if (isset($newElement['toSchema']) && isset($newElement['toSchema']['data'])) {
+                     $this->addSchemaFor($forms[$formname], $newElement['toSchema']['data'], $idx + 1);
+                  }
+
+                  if (isset($newElement['toForm']) && isset($newElement['toForm']['data'])) {
+                     $this->addFormElFor($forms[$formname], $newElement['toForm']['data'], $idx + 1, $into);
+                  }
+
+                  if (isset($newElement['toValidation']) && isset($newElement['toValidation']['data'])) {
+                     $this->addValidationFor($forms[$formname], $newElement['toValidation']['data'], $idx + 1, $into);
+                  }
+               }
+            }
+            else {
+            if (isset($newElements['toSchema']) && isset($newElements['toSchema']['data'])) {
+               $pos = (isset($newElements['toSchema']['pos'])) ? $newElements['toSchema']['pos'] : 0;
+               $this->addSchemaFor($forms[$formname], $newElements['toSchema']['data'], $pos);
+            }
+
+            if (isset($newElements['toForm']) && isset($newElements['toForm']['data'])) {
+               $pos = (isset($newElements['toForm']['pos'])) ? $newElements['toForm']['pos'] : 0;
+               $this->addFormElFor($forms[$formname], $newElements['toForm']['data'], $pos, $into);
+            }
+            }
+         }
+
+         $currForm = $forms[$formname];
+         $currForm['prefix'] = $formname; //'prefix' is a new value added to current form structure
+
+         //// filtering 'depends' rules, to extract rule version for server
+         $currRules = $currForm['validation']['rules'];
+         if (!empty($currRules) && is_array($currRules)) {
+         foreach($currRules as $ruleField => $ruleData) {
+            foreach ($ruleData as $ruleCode => $value) {
+               if (is_array($value)) {
+                  foreach ($value as $condCode => $condVal) {
+                     switch ($condCode) {
+                     case 'depends':
+                        if (is_array($condVal) && array_key_exists($method, $condVal))
+                             $value2Render = $condVal[$method];
+                        else $value2Render = $condVal;
+
+                        $currForm['validation']['rules'][$ruleField][$ruleCode][$condCode] = $value2Render;
+                        break;
+                     }
+                  }
+               }
+            }
+         }
+         }
+
+         if (isset($currForm['restrictions']) && !$this->__validateRestrictions($currForm['restrictions']))
+         die;
+
+         if (!empty($defaults) && is_array($defaults)) {
+            foreach($defaults as $field=>$value) {
+               //$currForm['defaults'][$field] = $value;
+               $currForm['schema'][$field]['default'] = $value;
+            }
+         }
+         
+         $currJSON = replaceRTags($currForm, $paramlist);
+
+         if (isset($regexPatterns) && !empty($regexPatterns)) {
+            $currJSON['regex'] = str_replace('\\','\\\\', $regexPatterns);
+         }
+
+         $currJSON = json_encode($currJSON);
+
+         return $currJSON;
+      }
+   }
+}

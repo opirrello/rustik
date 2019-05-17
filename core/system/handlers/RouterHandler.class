@@ -1,0 +1,88 @@
+<?php
+class RouterHandler {
+   private $url_mapping;
+   private $adic_base_path;
+   public static $instance;
+
+   private function __construct() {
+      if (is_file(RM_CORE_CONFIGPATH .'mapping.conf')) {
+         include (RM_CORE_CONFIGPATH .'mapping.conf'); //this include retrieve the array $url_mapping
+
+         $this->setUrlMapping($url_mapping);
+      }
+   }
+
+   public static function getInstance() {
+      if (!isset(self::$instance)) {
+         self::$instance = new RouterHandler();
+      }
+
+      return self::$instance;
+   }
+
+   private function setUrlMapping($url_mapping) {
+      $this->url_mapping = $url_mapping;
+      $this->adic_base_path = str_replace('/','\/', RM_MAPPINGROOT);
+   }
+
+   public function getMapping() {
+      return $this->url_mapping;
+   }
+
+   public function getRouteInfoFrom($url) {
+      $url_mapping = $this->url_mapping;
+      $arr_matches = NULL;
+
+      foreach ($url_mapping as $map) {
+         $map['pattern'] = $this->adic_base_path.$map['pattern'];
+
+         if (preg_match('/^'.$map['pattern'].'$/', $url, $arr_matches)) {
+            if (!empty($arr_matches[0])) {
+               $parameters = (array_slice($arr_matches,1));
+
+               list ($controller, $method) = explode(':', $map['target']);
+
+               /// Si el controlador pasado en mapping es parametrizado ($1o $2...)
+               /// lo convierte a formato camelCase
+               if (strpos($controller,'$') !== false) {
+                  $controller = explode("_",$parameters[intval(substr($controller,1)) - 1]);
+                  $aux = array();
+                  $jj = 0;
+
+                  foreach($controller as $word){
+                     $aux[] = ($jj)?ucfirst($word):$word;
+                     $jj++;
+                  }
+
+                  $controller = implode("", $aux);
+                  $idx++;
+               }
+
+               /// Si el metodo pasado en mapping es parametrizado ($1o $2...)
+               /// lo convierte a formato camelCase
+               if (strpos($method,'$') !== false) {
+                  $method = explode("_",$parameters[intval(substr($method,1)) - 1]);
+                  $aux = array();
+                  $jj = 0;
+
+                  foreach($method as $word){
+                     $aux[] = ($jj)?ucfirst($word):$word;
+                     $jj++;
+                  }
+
+                  $method = implode("", $aux);
+                  $idx++;
+               }
+
+               if ($idx) {
+                  $parameters = explode('-',substr($parameters[$idx],1));
+               }
+
+               break;
+            }
+         }
+      }
+
+      return array($controller, $method, $parameters);
+   }
+}
