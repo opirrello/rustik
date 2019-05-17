@@ -1,0 +1,484 @@
+/**************************************
+DUMP DEBUGGING STYLES
+***************************************/
+table.dump{ border: 1px solid black; font-size: 12px; }
+table.dump tr td.detail{ background: #FFF; border-top:none; border-right:none; border-left:none }
+table.dump tr td.detail font{ color: #000; }
+table.dump tr td.cell-name{ background: #A1A1A1; border-left:none; border-right:none }
+table.dump tr td.cell-name font{ color: #000; }
+table.dump tr td.cell-value{ background: #E1E1E1; border-right:none }
+table.dump tr td.cell-value font{ color: #000; }
+
+table.dump tr td {border:1px solid black; padding:2px}
+table.dump tr td {border-bottom:none}
+
+#dump-floating{ position: absolute; display: block; clear: both; width: 100%; height:1px; z-index: 1000; }
+#dump-floating #alin{ position: relative; display: inline; float: left; background: #ACACAC; }
+#dump-floating #controls { display: table; padding: 4px; width: 96%; }
+#dump-floating #alin #controls a{
+    float: left;
+    position:relative;
+    display: inline;
+    font-weight: bold;
+    line-height: 24px;
+    font-size: 14px;
+    padding-right: 10px;
+    color: #333;
+}
+#dump-floating #controls a#show-hide{ font-size: 22px; margin-top: -2px; }
+#dump-floating #controls a#get-info{ float: right; }
+#dump-floating #info{ background:none repeat scroll 0 0 #111; color:#ccc; display:table; position:absolute; display:none; }
+#dump-floating #info ul{ margin:10px; padding: 0px; list-style:disc inside; }
+
+body.stop-scrolling { height: auto !important; }
+
+.modal-backdrop.in {
+   opacity: 0.8 !important;
+   -moz-opacity: 0.8 !important;
+   -khtml-opacity: 0.88 !important;
+   /* filter: alpha(opacity=80) !important;*/
+   filter:progid:DXImageTransform.Microsoft.Alpha(opacity=80) !important;
+}
+
+.sweet-overlay {
+   background: #000;
+   opacity: 0.8 !important;
+   -moz-opacity: 0.8 !important;
+   -khtml-opacity: 0.88 !important;
+   /* filter: alpha(opacity=80) !important;*/
+   filter:progid:DXImageTransform.Microsoft.Alpha(opacity=80) !important;
+}
+.spinner-overlay {
+   background: #000;
+   opacity: 0.8;
+   -moz-opacity: 0.8;
+   -khtml-opacity: 0.88;
+   /* filter: alpha(opacity=80);*/
+   filter:progid:DXImageTransform.Microsoft.Alpha(opacity=80);
+   position: fixed;
+   top: 0;
+   left: 0;
+   width: 100%;
+   height: 100%;
+   z-index: 10000;
+   display: none;
+}
+
+.header-logout a.navbar-brand {margin: 15px auto; padding:5px 20px}
+.header-login a.navbar-brand {padding:10px 20px 0}
+.header-login p.navbar-text {padding:22px 20px 0}
+
+.dataTables_paginate .paginate_button:hover {background-color: #e6e6e6;}
+.dataTables_paginate .paginate_button.current,
+.dataTables_paginate .paginate_button.current:hover,
+.dataTables_paginate .paginate_button.current:focus {cursor:default}
+.dataTables_paginate .paginate_button.shortcut {padding:0; font-size:22px;}
+
+.dataTables_length .select2-selection--multiple .select2-search__field {width:105px !important}
+.dataTables_length .select2-selection--multiple .select2-search__field[placeholder=""] {width:0.75em !important}
+.dataTables_length .select2-selection--multiple {height:36px}
+.dataTables_length .select2-selection--multiple .select2-selection__choice {padding: 5px 12px; background-color: #eee; color: #333}
+
+.btn.gral-action.disabled {
+   opacity: 0.3;
+   -moz-opacity: 0.3;
+   -khtml-opacity: 0.33;
+   /* filter: alpha(opacity=30);*/
+   filter:progid:DXImageTransform.Microsoft.Alpha(opacity=30);
+}
+
+.modal-dialog.modal-dialog-centered {
+   min-height: calc(100% - (1.75rem * 2));
+   align-items: center;
+   -webkit-box-align: center;
+   -ms-flex-align: center;
+   display: -webkit-box;
+   display: -ms-flexbox;
+   display: flex;
+   margin: 1.75rem auto;
+}
+.modal-dialog .modal-content { width: 100%; }
+
+#alertWindowContent .verbose-container { display:none; max-height: 100px; overflow-y: scroll; }
+#alertWindowContent .manager-user-container { padding:0 50px 20px }
+#alertWindowContent table tr td { padding:10px 5px; vertical-align:top; text-align:left; border:1px solid #FFF; }
+#alertWindowContent table tr td:first-child { vertical-align:middle; }
+#alertWindowContent table tr td:last-child { background:#F9F9F9; }
+
+.label.label-cpaid { background-color: #666; border-color: #666; font-size: 12px; padding: 1px 5px 0px 5px }
+.label.label-alert { background-color: #eacb43; }
+
+/*------------------------------------------
+/* List Style                              
+/*----------------------------------------*/
+#DataTables_Table_0 .result-list tr.del { color: #C5C5C5; }
+
+/*----------------------------------------*/
+/* Form styles
+/*----------------------------------------*/
+/* JSONFORMS                              */
+/*----------------------------------------*/
+/** BuildForm styles **********************/
+.buildform-messagebox { display: inline-block; width: 100%; }
+.spinner-overlay {
+   background: #000;
+   opacity: 0.8;
+   -moz-opacity: 0.8;
+   -khtml-opacity: 0.88;
+   /* filter: alpha(opacity=80);*/
+   filter:progid:DXImageTransform.Microsoft.Alpha(opacity=80);
+   position: fixed;
+   top: 0;
+   left: 0;
+   width: 100%;
+   height: 100%;
+   z-index: 10000;
+   display: none;
+}
+
+/** Colorbox styles ***********************/
+.jsonform #cboxTitle { top:0; height:30px}
+
+/** Boostrap styles ***********************/
+.error-title { font-size:100px }
+.alert .close {
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+    position: absolute;
+    top: 10px;
+    font-size: 22px;
+    right: 10px;
+    font-weight: bold;
+}
+
+.alert {
+   padding: 15px;
+   margin-bottom: 20px;
+   border: 1px solid transparent;
+   -webkit-border-radius: 4px;
+   -moz-border-radius: 4px;
+   border-radius: 4px;
+   text-align:center
+}
+.alert-danger { color: #bd6260; background-color: #f2dede; border-color: #ebccd1; }
+.alert-danger .close { color: #d5a0a8; }
+.alert-success { color: #678147; background-color: #dcf6ba; border-color: #c2daa3; }
+.alert-success .close { color: #acc889; }
+.alert strong{ display: block; font-size: 16px; font-weight: normal; padding-bottom: 10px; }
+
+.label.profile {margin-top:5px}
+.bg-default-400 { background-color: #BBB; border-color: #BBB; color: #FFF; }
+
+.jsonform.fixed form>div .control-group {width:inherit}; 
+.jsonform form>div { background: none; margin: 0 auto; display: block; }
+.jsonform form>div input[type=submit] { }
+
+.jsonform form>div .section-group {display: table; width:100%}
+.jsonform form>div .control-group {display:table; margin:5px 0; width:100%; position:relative}
+
+.jsonform form>div .control-group .control-label ,
+.jsonform form>div .section-group .control-label { display:block; margin:4px 0; padding:0; font-size:12px; font-weight:bold }
+
+.jsonform form>div .section-group.inline .control-group {display:inline-block; vertical-align:top}
+.jsonform form>div .section-group.inline .control-group {padding-right:10px; padding-left:10px}
+.jsonform form>div .section-group.inline .control-group:first-child,
+.jsonform form>div .section-group.inline :not(.control-group) + .control-group {padding-right:10px; padding-left:0px}
+.jsonform form>div .section-group.inline .control-group:last-child {padding-right:0px; padding-left:10px}
+
+.jsonform form>div .control-group .controls { display:table; position:relative; margin: 4px 0; width:100% }
+.jsonform form>div .control-group .controls span.error { position:absolute; z-index:1111 }
+.jsonform form>div .control-group .controls span.error.left { display:inline !important; margin-right: 4px; }
+.jsonform form>div .control-group .controls span.error.right { display:inline !important; margin-left: 4px; }
+.jsonform form>div .control-group .controls span.error.top { bottom:100%; display:table }
+.jsonform form>div label.radio.btn { background:#EEE; border:unset; margin:0 auto; }
+.jsonform form>div label.radio.btn span { font-weight:bold !important }
+.jsonform form>div label.radio.btn:hover { background:#D8ECFC; }
+.jsonform form>div label.radio.btn.active { color:#FFF; background:#2196F3; }
+.jsonform form>div label.checkbox input.switchery { color:#2196F3; }
+.jsonform form>div label.checkbox span:last-child { font-weight:bold; margin-left:6px; }
+
+.jsonform form>div .control-group .controls span.error label{
+   background: #BC5136;
+   display: table !important;
+   margin-bottom: 0;
+   color: #fff;
+   vertical-align: middle;
+   line-height: 20px;
+   font-weight: bold;
+   font-size: 12px;
+   opacity: 0.8;
+   -moz-opacity: 0.8;
+   -khtml-opacity: 0.88;
+   /* filter: alpha(opacity=80);*/
+   filter:progid:DXImageTransform.Microsoft.Alpha(opacity=80);
+   padding:5px 6px;
+   -webkit-border-radius: 4px;
+   -moz-border-radius: 4px;
+   border-radius: 4px;
+   -webkit-box-shadow: 0px 0px 4px 1px rgba(124,67,53,0.33);
+   -moz-box-shadow: 0px 0px 4px 1px rgba(124,67,53,0.33);
+   box-shadow: 0px 0px 4px 1px rgba(124,67,53,0.33);
+}
+
+.jsonform form>div .control-group .controls span.error i {
+   position: absolute;
+   width: 0;
+   height: 0;
+   border-color: transparent;
+   border-top-color: transparent;
+   border-style: solid;
+   opacity: 0.8;
+  -moz-opacity: 0.8;
+  -khtml-opacity: 0.88;
+   /* filter: alpha(opacity=80);*/
+  filter:progid:DXImageTransform.Microsoft.Alpha(opacity=80);
+}
+.jsonform form>div .control-group .controls span.error.top i,
+.jsonform form>div .control-group .controls span.error.bottom i { left: 50%; margin-left: -4px; }
+.jsonform form>div .control-group .controls span.error.top i { bottom:-4px; border-width: 4px 4px 0; border-top-color: #BC5136; }
+.jsonform form>div .control-group .controls span.error.bottom i { top:-4px; border-width: 0 4px 4px; border-bottom-color: #BC5136; }
+
+.jsonform form>div .control-group .controls span.error.right i,
+.jsonform form>div .control-group .controls span.error.left i { top: 50%; margin-top: -4px; }
+
+.jsonform form>div .control-group .controls span.error.right i { left:-4px; border-width: 4px 4px 4px 0; border-right-color: #BC5136; }
+.jsonform form>div .control-group .controls span.error.left i { right:-4px; border-width: 4px 0 4px 4px; border-left-color: #BC5136; }
+
+.jsonform form>div .control-group .controls span.with-currency:before {
+   content: "$";
+   position: absolute;
+   line-height: 28px;
+   margin-left: 1px;
+   margin-top: 1px;
+   background: #BBB;
+   padding:0 4px;
+   color: #FFF;
+   -webkit-border-top-left-radius: 3px;
+   -moz-border-top-left-radius: 3px;
+   border-top-left-radius: 3px;
+   -webkit-border-bottom-left-radius: 3px;
+   -moz-border-bottom-left-radius: 3px;
+   border-bottom-left-radius: 3px;
+   box-sizing: border-box;
+   width:15px;
+}
+.jsonform form>div .control-group .controls span.with-currency input  { padding-left:17px; text-align:right; }
+
+.jsonform form>div .jsonform-required > label::after ,
+.jsonform form>div .jsonform-required > .required-mark::after {
+   color:#BC5136;
+   content:"*";
+   font-family: "Verdana";
+   position:absolute;
+   font-size: 18px;
+   font-weight: normal;
+   margin: -4px 0 0 4px;
+}
+
+.jsonform form>div .jsonform-required > .required-mark::after { margin-left:0; margin-top:-30px}
+.jsonform form>div .jsonform-required > .required-mark.before::after { margin-left:-13px; }
+
+.jsonform form>div .jsonform-required > .required-mark {margin:0; display:inline; }
+.jsonform form>div .jsonform-required > .required-mark.after { float:right }
+.jsonform form>div .jsonform-required > .required-mark.before { float:left}
+ 
+.sp-input,
+.jsonform form>div .control-group textarea,
+.jsonform form>div .control-group select,
+.jsonform form>div .control-group input[type="date"],
+.jsonform form>div .control-group input[type="calendar"],
+.jsonform form>div .control-group input[type="number"],
+.jsonform form>div .control-group input[type="money"],
+.jsonform form>div .control-group input[type="text"],
+.jsonform form>div .control-group input[type="password"] {
+    border: 1px solid #cccccc;
+    padding: 4px 6px;
+    font-size: 12px;
+    font-family: arial;
+    line-height: 20px;
+    color: #555;
+    vertical-align: middle;
+    -webkit-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+    -moz-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+    -webkit-transition: border linear 0.2s, box-shadow linear 0.2s;
+    -moz-transition: border linear 0.2s, box-shadow linear 0.2s;
+    -o-transition: border linear 0.2s, box-shadow linear 0.2s;
+    transition: border linear 0.2s, box-shadow linear 0.2s;
+    -webkit-border-radius: 3px;
+    -moz-border-radius: 3px;
+    border-radius: 3px;
+    box-sizing: border-box;
+    width:100%;
+}
+.jsonform form>div .control-group select { height: 30px; }
+.jsonform form>div .control-group select[multiple="multiple"] { height: unset; }
+
+.jsonform form>div .control-group textarea:focus,
+.jsonform form>div .control-group select:focus,
+.jsonform form>div .control-group input[type="text"]:focus,
+.jsonform form>div .control-group input[type="password"]:focus {
+    border-color: rgba(82, 168, 236, 0.8);
+    outline: 0;
+    outline: thin dotted \9;
+    /* IE6-9 */
+    -webkit-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075), 0 0 8px rgba(82, 168, 236, 0.6);
+    -moz-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075), 0 0 8px rgba(82, 168, 236, 0.6);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075), 0 0 8px rgba(82, 168, 236, 0.6);
+}
+
+.jsonform form>div .control-group input[aria-invalid='true'],
+.jsonform form>div .control-group textarea[aria-invalid='true'],
+.jsonform form>div .control-group select[aria-invalid='true'],
+.jsonform form>div .control-group input[aria-invalid='true']:focus,
+.jsonform form>div .control-group textarea[aria-invalid='true']:focus,
+.jsonform form>div .control-group select[aria-invalid='true']:focus {
+  color: #b94a48;
+  border-color: #E0A191;
+  -webkit-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075), 0 0 8px rgba(224, 161, 145, 0.6);
+  -moz-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075), 0 0 8px rgba(224, 161, 145, 0.6);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075), 0 0 8px rgba(224, 161, 145, 0.6);
+}
+
+.jsonform .help-inline {
+  display: block;
+  position: relative;
+  padding-left: 5px;
+  margin:2px auto;
+  line-height: 12px;
+  vertical-align: middle;
+  font-size: 10px;
+  font-style: oblique;
+  color: #666;
+  *zoom: 1;
+}
+
+/** custom jsonform styles ***********************/
+.jsonform form .control-group .controls .itemlist {
+   position:absolute;
+   width:422px;
+   display:none;
+   z-index: 1;
+   background:#EEE;
+   -webkit-box-shadow: 4px 4px 10px #666;
+   -moz-box-shadow: 4px 4px 10px #666;
+   box-shadow: 4px 4px 10px #666;
+   padding: 5px;
+}
+.jsonform form .control-group .controls .itemlist a.close::before {
+   content: "✖";
+   position: absolute;
+   margin-left: -1px;
+   color: #4D6185;
+   margin-top: -3px;
+   opacity: 0.6;
+   -moz-opacity: 0.6;
+   -khtml-opacity: 0.6;
+   /* filter: alpha(opacity=60);*/
+   filter:progid:DXImageTransform.Microsoft.Alpha(opacity=60);
+}
+
+.jsonform form .control-group .controls .palette div.page  {display:table; border-collapse:separate; border-spacing:0px;}
+.jsonform form .control-group .controls .itemlist div.page {display:table; border-collapse:separate; border-spacing:4px;}
+.jsonform form .control-group .controls .palette div.page span { width:14px; height: 14px; display: inline; float:left; }
+.jsonform form .control-group .controls .itemlist div.page a {
+   display:table-cell; 
+   width:60px; 
+   height:60px;
+   text-align:center;
+   vertical-align:middle;
+}
+
+.palette-color.reset::after {
+    content: 'x';
+    position: relative;
+    vertical-align: middle;
+    height: 15px;
+    display: block;
+    font-size: 11px;
+    text-align: center;
+    color: #999;
+}
+
+.jsonform form .control-group .controls .spriteselect .container {display: inline-block}
+.jsonform form .control-group .controls .spriteselect .container .palette,
+.jsonform form .control-group .controls .spriteselect .container .choosencont {background:#D1D1D1; display:inline-block; float:left }
+.jsonform form .control-group .controls .spriteselect .container .palette {margin-left:2px; padding:7px; height:57px;}
+.jsonform form .control-group .controls .spriteselect .container .choosencont { height:71px; width:71px}
+.jsonform form .control-group .controls .spriteselect .container .choosen {
+   width: 61px;
+   height: 61px;
+   background: #C4C4C4;
+   display: inline-block;
+   margin: 5px;
+   -webkit-border-radius: 32px;
+      -moz-border-radius: 32px;
+           border-radius: 32px;
+}
+
+.jsonform form .control-group .controls .spriteselect .container .choosen span { margin: 4px auto; }
+.jsonform form .control-group .controls .spriteselect .container .choosencont .open::after {
+   content: "+";
+   vertical-align: middle;
+   text-align: center;
+   display: inline-block;
+   margin-top: -39%;
+   margin-left: -42%;
+   width: 25px;
+   height: 25px;
+   line-height: 24px;
+   font-size: 24px;
+   font-weight: bold;
+   cursor: pointer;
+   -webkit-border-radius: 13px;
+      -moz-border-radius: 13px;
+           border-radius: 13px;
+   color: #C4C4C4;
+   background: #8793A8;
+   opacity: 0.6;
+   -moz-opacity: 0.6;
+   -khtml-opacity: 0.6;
+   /* filter: alpha(opacity=60);*/
+   filter:progid:DXImageTransform.Microsoft.Alpha(opacity=60);
+}
+
+.jsonform form .control-group .controls .spriteselect .container .choosencont .open.change::after { content: "↺"; font-size: 18px; }
+.jsonform form .control-group .controls .spriteselect .container .palette .palette-color {cursor:pointer}
+.jsonform form .control-group .controls .spriteselect .container .palette .palette-color.reset {margin-top:2px}
+
+/**** LOGIN FORM (jsonform) ****/
+#login-container .page-content { display: table; width: 27%; margin: 0 auto; }
+#login-form-container {text-align:center}
+.jsonform form#login .control-group {width:100%}
+.jsonform form#login #login-elt-login {width:100%}
+
+/****************************************************
+/*  OTHER DEVICES STYLES (cellphones/tablets)
+****************************************************/
+@media only screen and (max-width: 1024px) {
+  #welcome-video .modal-dialog {width:95%;}
+}
+
+@media only screen and (max-width: 900px) {
+  #welcome-video .modal-dialog {width:90%;}
+  #page-container .jsonform form#signup #basic-info #address-data .jsonform-error-address { width:33.33%; }
+  #page-container .jsonform form#signup #basic-info #address-data .jsonform-error-city { width:33.33%; }
+  #page-container .jsonform form#signup #basic-info #address-data .jsonform-error-zip_code { width:33.33%; padding-right:0 }
+  #page-container .jsonform form#signup #basic-info #address-data .jsonform-error-country { width:50%; padding-left:0; padding-right:0 }
+
+  #page-container .jsonform form#signup #basic-info #phone-data .jsonform-error-telcode { width:19%; }
+  #page-container .jsonform form#signup #basic-info #phone-data .jsonform-error-telnumber { width:28%; }
+
+  #page-container .jsonform form#signup #additional-questions .kv-file-content {visibility:hidden; width:1px; padding:0}
+}
+
+@media only screen and (max-width: 500px) {
+  .dl-horizontal dd { margin-left: 161px; }
+
+  .header-login p.navbar-text { padding: 24px 20px; position: absolute; float: right; right: 32px;}
+  
+  #page-container .panel-flat { width: 100%; }
+  #page-container .page-container { padding:0; }
+}
+
