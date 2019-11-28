@@ -56,15 +56,19 @@ class HtmlHandler {
          break;
 
       case "select":
-         $specific_attr = array('onchange','onselect','selected','multiple');
+         $specific_attr = array('onchange','onselect','selected','multiple','name');
          break;
 
       case "form":
-         $specific_attr = array('method','action','onsubmit');
+         $specific_attr = array('method','action','onsubmit','name');
          break;
 
       case "input":
-         $specific_attr = array('value','type','rel');
+         $specific_attr = array('value','type','rel','name');
+         break;
+
+      case "textarea":
+         $specific_attr = array('rel','name','cols','rows');
          break;
 
       case "table":
