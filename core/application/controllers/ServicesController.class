@@ -71,7 +71,10 @@ class ServicesController extends Controller {
 
          if (!empty($authInfo) && is_array($authInfo)) {
             $imgStruct[] = RF_DATAPATH;
-            $imgStruct[] = $targetPath;
+            
+            if ($targetPath) 
+            $imgStruct[] = str_replace('/','',$targetPath);
+
             $imgStruct[] = $imgName;
          }
          else return false;
@@ -205,7 +208,10 @@ class ServicesController extends Controller {
 
          if (!empty($authInfo) && is_array($authInfo)) {
             $imgStruct[] = RF_DATAPATH;
-            $imgStruct[] = $targetPath;
+
+            if ($targetPath) 
+            $imgStruct[] = str_replace('/','',$targetPath);
+
             $imgStruct[] = $imgName;
          }
          else return false;
@@ -227,6 +233,11 @@ class ServicesController extends Controller {
          case 'gif': header('Content-Type: image/gif'); break;
          case 'jpg': header('Content-Type: image/jpeg'); break;
          case 'png': header('Content-Type: image/png'); break;
+         case 'csv': header('Content-Type: text/csv'); break;
+         case 'xls':
+         case 'xlsx':header('Content-Type: application/vnd.ms-excel'); break;
+         case 'doc':
+         case 'docx':header('Content-Type: application/msword'); break;
       }
 
       ob_clean();
